@@ -27,7 +27,6 @@ const AdminDashboard: React.FC = () => {
           }
         }} 
       />
-
       </View>
       <View style={styles.content}>
         {currentView === 'addFaculty' ? (
@@ -36,13 +35,12 @@ const AdminDashboard: React.FC = () => {
               onClose={() => setCurrentView('faculty')} 
             />
             <QueueInfo
-                queueCount={8}
-                onAddFaculty={() => setCurrentView('addFaculty')}
-                onAddStudent={() => alert("Add Student")}
-                onViewRatings={() => alert("Faculty Ratings")}
-              />
+              queueCount={8}
+              onAddFaculty={() => setCurrentView('addFaculty')}
+              onAddStudent={() => alert("Add Student")}
+              onViewRatings={() => alert("Faculty Ratings")}
+            />
           </View>
-          
         ) : currentView === 'profile' ? (
           <Profile />
         ) : currentView === 'statistics' ? (
@@ -59,17 +57,32 @@ const AdminDashboard: React.FC = () => {
           </View>
         )}
       </View>
-      
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, flexDirection: "row" },
-  sidebar: { flex: 0.1, backgroundColor: "#333" },
-  content: { flex: 1, backgroundColor: "#4CAF50" },
-  FacultyList: { flex: 1 ,width: "100%"},
-  facultyContainer: { flexDirection:"row", padding: 20 , justifyContent: "space-between" },
+  container: { 
+    flex: 1, 
+    flexDirection: "row" 
+  },
+  sidebar: { 
+    flex: 0.1, 
+    backgroundColor: "#333" 
+  },
+  content: { 
+    flex: 1, 
+    backgroundColor: "#4CAF50" 
+  },
+  FacultyList: { 
+    flex: 1 ,
+    width: "100%"
+  },
+  facultyContainer: { 
+    flexDirection:"row", 
+    padding: 20 , 
+    justifyContent: "space-between" 
+  },
 });
 
 export default AdminDashboard;
