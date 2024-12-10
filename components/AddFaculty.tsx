@@ -125,7 +125,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>ADD FACULTY</Text>
+      <Text style={styles.title}>ADD FACULTY y</Text>
 
       <TextInput
         style={styles.input}
