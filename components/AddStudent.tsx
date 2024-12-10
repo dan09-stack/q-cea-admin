@@ -13,11 +13,11 @@ import { collection, addDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
 
-interface AddFacultyProps {
+interface AddStudentProps {
   onClose: () => void;
 }
 
-interface FacultyFormData {
+interface StudentFormData {
   fullName: string;
   idNumber: string;
   program: string;
@@ -26,9 +26,9 @@ interface FacultyFormData {
   password: string;
 }
 
-const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
+const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<FacultyFormData>({
+  const [formData, setFormData] = useState<StudentFormData>({
     fullName: "",
     idNumber: "",
     program: "",
@@ -97,25 +97,23 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const user = userCredential.user;
 
-        await db.collection('faculty').doc(user.uid).set({
+        await db.collection('student').doc(user.uid).set({
           fullName: formData.fullName,
           idNumber: formData.idNumber,
           phoneNumber: formData.phoneNumber,
           program: formData.program,
           email: formData.email,
-          userType: 'faculty',
-          status: 'OFFLINE',
-          createdAt: new Date().toISOString()
+          userType: 'student'
         });
         await sendEmailVerification(user);
   
-        showAlert("Success", "Faculty member added successfully");
+        showAlert("Success", "Student added successfully");
         onClose();
       } catch (error: any) {
         console.error("Detailed error:", error); // Add detailed logging
         showAlert(
           "Error", 
-          error.message || "Failed to add faculty member" // Show actual error message
+          error.message || "Failed to add student" // Show actual error message
         );
       } finally {
         setIsLoading(false);
@@ -125,7 +123,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>ADD FACULTY</Text>
+      <Text style={styles.title}>ADD STUDENT</Text>
 
       <TextInput
         style={styles.input}
@@ -272,4 +270,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AddFacultyScreen;
+export default AddStudentScreen;

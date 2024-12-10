@@ -4,6 +4,7 @@ import QueueInfo from "@/components/QueueInfo";
 import Sidebar from "@/components/SideBar";
 import Profile from '@/components/Profile';
 import Statistics from '@/components/Statistics';
+import AddStudent from "@/components/AddStudent";
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 
@@ -29,15 +30,23 @@ const AdminDashboard: React.FC = () => {
       />
       </View>
       <View style={styles.content}>
-        {currentView === 'addFaculty' ? (
+      {currentView === 'addFaculty' ? (
           <View style={styles.facultyContainer}>
-            <AddFaculty 
-              onClose={() => setCurrentView('faculty')} 
-            />
+            <AddFaculty onClose={() => setCurrentView('faculty')} />
             <QueueInfo
               queueCount={8}
               onAddFaculty={() => setCurrentView('addFaculty')}
-              onAddStudent={() => alert("Add Student")}
+              onAddStudent={() => setCurrentView('addStudent')}
+              onViewRatings={() => alert("Faculty Ratings")}
+            />
+          </View>
+        ) : currentView === 'addStudent' ? (
+          <View style={styles.facultyContainer}>
+            <AddStudent onClose={() => setCurrentView('faculty')} />
+            <QueueInfo
+              queueCount={8}
+              onAddFaculty={() => setCurrentView('addFaculty')}
+              onAddStudent={() => setCurrentView('addStudent')}
               onViewRatings={() => alert("Faculty Ratings")}
             />
           </View>
@@ -51,11 +60,13 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               queueCount={8}
               onAddFaculty={() => setCurrentView('addFaculty')}
-              onAddStudent={() => alert("Add Student")}
+              onAddStudent={() => setCurrentView('addStudent')}
               onViewRatings={() => alert("Faculty Ratings")}
             />
           </View>
-        )}
+          
+        )
+        }
       </View>
     </View>
   );
@@ -67,11 +78,11 @@ const styles = StyleSheet.create({
     flexDirection: "row" 
   },
   sidebar: { 
-    flex: 0.1, 
+    flex: 0.08, 
     backgroundColor: "#333" 
   },
   content: { 
-    flex: 1, 
+    flex: .92, 
     backgroundColor: "#4CAF50" 
   },
   FacultyList: { 
