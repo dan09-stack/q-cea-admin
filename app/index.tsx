@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { verifyAdminCredentials } from './services/adminAuth';
+import { verifyAdminCredentials } from '../services/adminAuth';
 
 const Index = () => {
   const router = useRouter();
