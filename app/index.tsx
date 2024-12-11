@@ -3,7 +3,7 @@ import { View, TextInput, Text, StyleSheet, TouchableOpacity, ActivityIndicator 
 import { useRouter } from 'expo-router';
 import { verifyAdminCredentials } from './services/adminAuth';
 
-const LoginScreen = () => {
+const Index = () => {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -141,4 +141,4 @@ const styles = StyleSheet.create({
 });
 
 
-export default LoginScreen;
+export default Index;
