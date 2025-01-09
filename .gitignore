@@ -37,3 +37,6 @@ yarn-error.*
 
 app-example
 .vercel
+
+# Local Netlify folder
+.netlify

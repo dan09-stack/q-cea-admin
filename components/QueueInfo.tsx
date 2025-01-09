@@ -6,6 +6,7 @@ interface QueueInfoProps {
   onAddFaculty: () => void;
   onAddStudent: () => void;
   onViewRatings: () => void;
+  onAddAdmin?: () => void;
 }
 
 const QueueInfo: React.FC<QueueInfoProps> = ({
@@ -13,6 +14,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
   onAddFaculty,
   onAddStudent,
   onViewRatings,
+  onAddAdmin,
 }) => {
   return (
     <View style={styles.container}>
@@ -24,7 +26,9 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
       <TouchableOpacity style={styles.button} onPress={onAddStudent}>
         <Text style={styles.buttonText}>ADD STUDENT</Text>
       </TouchableOpacity>
-      
+      <TouchableOpacity style={styles.button} onPress={onAddAdmin}>
+        <Text style={styles.buttonText}>ADD Q-CEA ADMIN</Text>
+      </TouchableOpacity>
     </View>
   );
 };

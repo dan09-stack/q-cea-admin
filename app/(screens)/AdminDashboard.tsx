@@ -7,13 +7,15 @@ import Statistics from '@/components/Statistics';
 import AddStudent from "@/components/AddStudent";
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
+import AddAdminScreen from "@/components/AddAdmin";
 
 const AdminDashboard: React.FC = () => {
   const [showAddFaculty, setShowAddFaculty] = useState(false);
   const [currentView, setCurrentView] = useState('faculty'); // 'faculty', 'profile', 'addFaculty'
-
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
   return (
     <View style={styles.container}>
+      
       <View style={styles.sidebar}>
       <Sidebar 
         navigation={{ 
@@ -30,6 +32,7 @@ const AdminDashboard: React.FC = () => {
       />
       </View>
       <View style={styles.content}>
+        
       {currentView === 'addFaculty' ? (
           <View style={styles.facultyContainer}>
             <AddFaculty onClose={() => setCurrentView('faculty')} />
@@ -38,6 +41,7 @@ const AdminDashboard: React.FC = () => {
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onViewRatings={() => alert("Faculty Ratings")}
+              onAddAdmin={() => setShowAddAdmin(true)}
             />
           </View>
         ) : currentView === 'addStudent' ? (
@@ -48,6 +52,7 @@ const AdminDashboard: React.FC = () => {
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onViewRatings={() => alert("Faculty Ratings")}
+              onAddAdmin={() => setShowAddAdmin(true)}
             />
           </View>
         ) : currentView === 'profile' ? (
@@ -62,11 +67,16 @@ const AdminDashboard: React.FC = () => {
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onViewRatings={() => alert("Faculty Ratings")}
-            />
+              onAddAdmin={() => setShowAddAdmin(true)}
+           />
+           
           </View>
           
         )
         }
+        {showAddAdmin && (
+          <AddAdminScreen onClose={() => setShowAddAdmin(false)} />
+        )}
       </View>
     </View>
   );
