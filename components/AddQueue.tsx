@@ -82,7 +82,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
 
     if (!selectedConcern && !otherConcern) {
-      Alert.alert('Error', 'Please select a concern or provide details in Other field');
+      Alert.alert('Error', 'Please select a concern or provide details in the Other field');
       return;
     }
 
@@ -101,6 +101,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         const currentNumber = ticketSnap.data().ticketNum;
         const newNumber = currentNumber + 1;
 
+        // Update the ticket number counter
         await updateDoc(ticketRef, {
           ticketNum: newNumber
         });
@@ -178,7 +179,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <Picker
                 selectedValue={selectedStudent}
                 onValueChange={(itemValue) => setSelectedStudent(itemValue)}
-                style={[styles.picker, { color: '#fff' }]}
+                style={[styles.picker, { color: '#ccc' }]}
               >
                 <Picker.Item label="Select Student" value="" color="#fff" />
                 {studentsList
@@ -216,7 +217,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <Picker
                 selectedValue={selectedConcern}
                 onValueChange={(itemValue) => setSelectedConcern(itemValue)}
-                style={[styles.picker, { color: '#fff' }]}
+                style={[styles.picker, { color: '#ccc' }]}
               >
                 <Picker.Item label="Select your concern" value="" color="#fff" />
                 <Picker.Item label="Concern A" value="concernA" color="#fff" />
@@ -265,105 +266,100 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 10,
-    textAlign: 'justify',  // Add this line to justify the title text
-    width: '100%'  // Ensure it takes up the full width to apply the justification
-  },
-  headerText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  subHeaderText: {
-    fontSize: 16,
-    color: '#fff',
+    textAlign: 'justify',
+    width: '100%',
   },
   ticketContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  ticketDetails: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 10,
+  headerText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#fff',
   },
-  ticketLabel: {
-    fontSize: 12,
-    color: '#ccc',
-  },
-  ticketNumber: {
+  subHeaderText: {
     fontSize: 20,
     color: '#fff',
+  },
+  ticketDetails: {
+    marginVertical: 20,
+    padding: 10,
+    backgroundColor: '#005C12',
+    borderRadius: 8,
+    width: '100%',
+  },
+  ticketLabel: {
+    fontSize: 14,
+    color: '#fff',
+  },
+  ticketNumber: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#fff',
   },
   ticketInfoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
   },
   ticketInfo: {
-    fontSize: 18,
+    fontSize: 14,
     color: '#fff',
   },
   waitText: {
     fontSize: 18,
-    fontWeight: 'bold',
     color: '#fff',
     marginTop: 10,
-  },
-  cancelButton: {
-    backgroundColor: '#ff4444',
-    paddingVertical: 10,
-    paddingHorizontal: 25,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
     textAlign: 'center',
   },
+  cancelButton: {
+    backgroundColor: '#D32F2F',
+    padding: 10,
+    marginTop: 20,
+    borderRadius: 5,
+  },
+  buttonText: {
+    fontSize: 16,
+    color: '#fff',
+  },
   formGroup: {
-    marginBottom: 20,
+    marginTop: 10,
   },
   pickerContainer: {
-    marginVertical: 10,
+    marginBottom: 15,
   },
   picker: {
     height: 50,
-    width: '100%',
-    backgroundColor: "#2e4f2e",
-    color: '#fff',
-    
+    borderWidth: 1,
+    borderRadius: 4,
+    color: '#ccc',
+    backgroundColor: '#1b5e20',
   },
   input: {
     height: 100,
-    backgroundColor: "#2e4f2e",
+    backgroundColor: '#1b5e20',
     color: '#fff',
-    borderRadius: 5,
+    borderRadius: 4,
     paddingHorizontal: 10,
-    marginVertical: 10,
+    marginBottom: 20,
   },
   buttonContainer: {
-    flexDirection: 'row',  // This makes the buttons appear side by side
-    justifyContent: 'space-between',  // This ensures there is space between the buttons
-    marginTop: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   submitButton: {
-    backgroundColor: '#004000',
-    paddingVertical: 10,
-    paddingHorizontal: 25,
+    backgroundColor: '#388E3C',
+    padding: 10,
+    width: '48%',
     borderRadius: 5,
-    flex: 1,  // Ensures the button takes up equal space
-    marginRight: 10,  // Adds space between the buttons
+    alignItems: 'center',
   },
   closeButton: {
     backgroundColor: '#757575',
-    paddingVertical: 10,
-    paddingHorizontal: 25,
+    padding: 10,
+    width: '48%',
     borderRadius: 5,
-    flex: 1,  // Ensures the button takes up equal space
+    alignItems: 'center',
   },
 });
 

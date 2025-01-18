@@ -8,20 +8,10 @@ import AddStudent from "@/components/AddStudent";
 import AddQueue from "@/components/AddQueue";
 import AddAdmin from "@/components/AddAdmin";
 import React, { useState } from "react";
-import { View, StyleSheet, Text } from "react-native";
+import { View, StyleSheet } from "react-native";
 
 const AdminDashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState('faculty'); // Default view is 'faculty'
-
-  const handleAddQueue = () => {
-    console.log('AddQueue button clicked');
-    setCurrentView('addQueue');
-  };
-
-  const handleAddAdmin = () => {
-    console.log('AddAdmin button clicked');
-    setCurrentView('addAdmin');
-  };
 
   return (
     <View style={styles.container}>
@@ -47,8 +37,8 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={handleAddAdmin} // Call the handler for AddAdmin
-              onAddQueue={handleAddQueue} // Call the handler for AddQueue
+              onAddAdmin={() => setCurrentView('addAdmin')}
+              onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
           </View>
@@ -58,8 +48,8 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={handleAddAdmin}
-              onAddQueue={handleAddQueue}
+              onAddAdmin={() => setCurrentView('addAdmin')}
+              onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
           </View>
@@ -69,8 +59,8 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={handleAddAdmin}
-              onAddQueue={handleAddQueue}
+              onAddAdmin={() => setCurrentView('addAdmin')}
+              onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
           </View>
@@ -80,8 +70,8 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={handleAddAdmin}
-              onAddQueue={handleAddQueue}
+              onAddAdmin={() => setCurrentView('addAdmin')}
+              onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
           </View>
@@ -95,8 +85,8 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={handleAddAdmin}
-              onAddQueue={handleAddQueue}
+              onAddAdmin={() => setCurrentView('addAdmin')}
+              onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
           </View>
@@ -106,42 +96,24 @@ const AdminDashboard: React.FC = () => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    flexDirection: "row"
-    
+    flexDirection: "row",
   },
   sidebar: { 
     flex: 0.08, 
-    backgroundColor: "#333" 
-    
-    
+    backgroundColor: "#333",
   },
   content: { 
-    flex: .92, 
-    backgroundColor: "#4CAF50", 
-   
-  },
-  FacultyList: { 
-    flex: 1 ,
-    width: "100%",
-    
+    flex: 0.92, 
+    backgroundColor: "#4CAF50",
   },
   facultyContainer: { 
-    flexDirection:"row", 
-    padding: 20 , 
-    justifyContent: "space-between" ,
-    
+    flexDirection: "row", 
+    padding: 20, 
+    justifyContent: "space-between",
   },
-  textsample: {
-    color: 'red',
-    fontSize: 20,
-    fontWeight: 'bold',
-    justifyContent: 'center',
-    alignItems: 'center',
-  }
 });
 
 export default AdminDashboard;
