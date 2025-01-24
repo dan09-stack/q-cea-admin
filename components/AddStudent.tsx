@@ -128,14 +128,14 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
       <TextInput
         style={styles.input}
         placeholder="Last Name, First Name"
-        placeholderTextColor="#ccc"
+        placeholderTextColor="#000000"
         value={formData.fullName}
         onChangeText={(text) => setFormData({...formData, fullName: text})}
       />
       <TextInput
         style={styles.input}
         placeholder="ID Number"
-        placeholderTextColor="#ccc"
+        placeholderTextColor="#000000"
         value={formData.idNumber}
         onChangeText={(text) => setFormData({...formData, idNumber: text})}
       />
@@ -159,7 +159,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
       <TextInput
         style={styles.input}
         placeholder="Phone Number"
-        placeholderTextColor="#ccc"
+        placeholderTextColor="#000000"
         keyboardType="phone-pad"
         value={formData.phoneNumber}
         onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
@@ -167,7 +167,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
       <TextInput
         style={styles.input}
         placeholder="PHINMA Email"
-        placeholderTextColor="#ccc"
+        placeholderTextColor="#000000"
         keyboardType="email-address"
         value={formData.email}
         onChangeText={(text) => setFormData({...formData, email: text})}
@@ -175,7 +175,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
       <TextInput
         style={styles.input}
         placeholder="Password"
-        placeholderTextColor="#ccc"
+        placeholderTextColor="#000000"
         // secureTextEntry
         value={formData.password}
         onChangeText={(text) => setFormData({...formData, password: text})}
@@ -204,11 +204,13 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   container: {
-    flex: 1,
-    backgroundColor: "#0d3310",
-    justifyContent: "center",
+    marginTop: 50,
+    margin: 20,
+    width: "70%",
+    backgroundColor: "#032911",
     alignItems: "center",
-    padding: 20,
+    padding: 30,
+    borderRadius: 15, 
   },
   title: {
     fontSize: 24,
@@ -219,27 +221,28 @@ const styles = StyleSheet.create({
   input: {
     width: "90%",
     height: 50,
-    backgroundColor: "#2e4f2e",
+    backgroundColor: "#f2efef",
     borderRadius: 5,
     paddingHorizontal: 15,
     marginBottom: 15,
-    color: "#fff",
+    color: "#000000",
     fontSize: 16,
   },
   pickerContainer: {
     width: "90%",
     height: 50,
-    backgroundColor: "#2e4f2e",
+    backgroundColor: "#f2efef",
     borderRadius: 5,
     justifyContent: "center",
     marginBottom: 15,
     overflow: "hidden",
   },
   picker: {
-    borderColor: "#2e4f2e",
-    backgroundColor: "#2e4f2e",
-    color: "#fff",
+    borderColor: "#f2efef",
+    backgroundColor: "#f2efef",
+    color: "#000000",
     width: "100%",
+    fontSize: 16,
   },
   buttonContainer: {
     flexDirection: "row",

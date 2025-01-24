@@ -22,8 +22,8 @@ const FacultyList: React.FC = () => {
 
   const TableHeader = () => (
     <View style={styles.headerRow}>
-      <Text style={styles.headerText}>Name</Text>
-      <Text style={styles.headerText}>Status</Text>
+      <Text style={styles.headerText}>NAME</Text>
+      <Text style={styles.headerText}>STATUS</Text>
     </View>
   );
 
@@ -83,7 +83,8 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 20,
+    color: "white",
   },
   searchInput: {
     height: 40,
@@ -95,13 +96,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   container: { 
+    marginTop: 50,
     margin: 20,
     width: "70%",
+    backgroundColor: '#032911',
+    padding: 30,  
+    borderRadius: 15, 
   },
-  title: { fontWeight: "bold", fontSize: 16, marginBottom: 10 },
-  row: { flexDirection: "row", justifyContent: "space-between", padding: 10 },
-  name: { fontSize: 14 },
-  online: { color: "green" },
+  title: { fontWeight: "bold", fontSize: 25, marginBottom: 15, color: "white" },
+  row: { flexDirection: "row", justifyContent: "space-between", padding: 13, borderBottomWidth: 1, borderBottomColor: "#ddd" },
+  name: { fontSize: 15, color: "white" },
+  online: { color: "green",  },
   offline: { color: "red" },
 });
 

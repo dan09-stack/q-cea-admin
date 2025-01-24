@@ -11,14 +11,20 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ navigation }) => {
   return (
     <View style={styles.sidebar}>
-      <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-        <Icon name="home-outline" size={30} color="#fff" />
+      <TouchableOpacity onPress={() => navigation.navigate("Home")} style={styles.icon}>
+        <Icon name="home-outline" size={40} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate("Dashboard")}>
-        <Icon name="stats-chart-outline" size={30} color="#fff" />
+      <TouchableOpacity onPress={() => navigation.navigate("Dashboard")} style={styles.icon}>
+        <Icon name="stats-chart-outline" size={40} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
-        <Icon name="person-outline" size={30} color="#fff" />
+      <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.icon}>
+        <Icon name="person-outline" size={40} color="#fff" />
+      </TouchableOpacity>
+      
+      {/* Logout Icon at the bottom */}
+      <View style={styles.spacer}></View>
+      <TouchableOpacity onPress={() => navigation.navigate("Logout")} style={styles.icon}>
+        <Icon name="log-out-outline" size={40} color="#fff" />
       </TouchableOpacity>
     </View>
   );
@@ -27,11 +33,19 @@ const Sidebar: React.FC<SidebarProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   sidebar: { 
     flex: 1, 
-    justifyContent: "space-around", 
-    backgroundColor: "#222", 
+    flexDirection: "column",  // Ensure vertical alignment
+    justifyContent: "flex-start", // Align the icons to the top
+    backgroundColor: "#032911", 
     padding: 10,
+    paddingTop: 100,
     alignItems: "center",
   },
+  icon: {
+    marginBottom: 80,  // Space between icons
+  },
+  spacer: {
+    flexGrow: 1,  // Push the logout icon to the bottom
+  }
 });
 
 export default Sidebar;
