@@ -27,6 +27,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         id: doc.id,
         fullName: doc.data().fullName || ''
       }));
+      console.log("Students List: ", students);  // Log the students data
       setStudentsList(students);
     });
 
@@ -37,6 +38,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         fullName: doc.data().fullName || '',
         status: doc.data().status || 'OFFLINE'
       }));
+      console.log("Faculty List: ", faculty);  // Log the faculty data
       setFacultyList(faculty);
     });
 
@@ -45,6 +47,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       const userUnsubscribe = onSnapshot(userRef, (doc) => {
         if (doc.exists()) {
           const userData = doc.data();
+          console.log("User Data: ", userData);  // Log the user data
           if (userData.status === 'waiting') {
             setIsRequested(true);
           } else {
@@ -58,6 +61,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       const ticketRef = doc(db, 'ticketNumberCounter', 'ticket');
       const ticketUnsubscribe = onSnapshot(ticketRef, (doc) => {
         if (doc.exists()) {
+          console.log("Ticket Number Data: ", doc.data());  // Log ticket data
           setTicketNumber(doc.data().ticketNum);
         }
       });
@@ -76,6 +80,8 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   }, []);
 
   const handleRequest = async () => {
+    console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);  // Log request details
+
     if (!selectedFaculty) {
       Alert.alert('Error', 'Please select a faculty');
       return;
@@ -83,6 +89,11 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     if (!selectedConcern && !otherConcern) {
       Alert.alert('Error', 'Please select a concern or provide details in the Other field');
+      return;
+    }
+
+    if (!selectedStudent) {
+      Alert.alert('Error', 'Please select a student');
       return;
     }
 
@@ -101,6 +112,8 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         const currentNumber = ticketSnap.data().ticketNum;
         const newNumber = currentNumber + 1;
 
+        console.log("New ticket number: ", newNumber);  // Log new ticket number
+
         // Update the ticket number counter
         await updateDoc(ticketRef, {
           ticketNum: newNumber
@@ -118,30 +131,67 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
         setTicketNumber(newNumber);
         setIsRequested(true);
+
+        // Now, update the status of the selected student
+        console.log("Updating status of selected student: ", selectedStudent);  // Log the student ID
+        const studentRef = doc(db, 'student', selectedStudent);
+        await updateDoc(studentRef, {
+          status: 'waiting'
+        });
+        Alert.alert('Success', 'Student status updated to waiting');
       }
     } catch (error) {
-      console.log('Error updating ticket number:', error);
+      console.log('Error updating ticket number:', error);  // Log any errors
       Alert.alert('Error', 'Failed to create ticket request');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancelQueue = async () => {
     try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const userRef = doc(db, 'student', currentUser.uid);
-        await updateDoc(userRef, {
-          status: 'cancelled',
-          userTicketNumber: null
-        });
+      // Get all students who are in 'waiting' status
+      const studentsCollectionRef = collection(db, 'student');
+      const querySnapshot = await getDocs(studentsCollectionRef);
+      
+      // Find the student with matching ticket number
+      const studentToCancel = querySnapshot.docs.find(doc => 
+        doc.data().userTicketNumber === userTicketNumber
+      );
+  
+      if (!studentToCancel) {
+        Alert.alert('Error', 'Could not find student ticket');
+        return;
       }
+  
+      // Update the student's record
+      const studentRef = doc(db, 'student', studentToCancel.id);
+      await updateDoc(studentRef, {
+        status: 'cancelled',
+        userTicketNumber: null,
+        faculty: null,
+        concern: null,
+        otherConcern: null,
+        requestDate: null
+      });
+  
+      // Reset local state
       setIsRequested(false);
+      setSelectedFaculty('');
+      setSelectedConcern('');
+      setOtherConcern('');
+      setUserTicketNumber('');
+  
+      Alert.alert('Success', 'Queue cancelled successfully');
     } catch (error) {
-      console.error('Error cancelling ticket:', error);
-      Alert.alert('Error', 'Failed to cancel ticket');
+      console.error('Error cancelling queue:', error);
+      Alert.alert('Error', 'Failed to cancel the queue');
     }
+  };
+  
+  const handleCancel = () => {
+    console.log("Cancel button pressed, closing the modal.");
+    onClose(); // Close the modal by calling the onClose function passed via props
   };
 
   return (
@@ -169,7 +219,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </View>
               <Text style={styles.waitText}>PLEASE WAIT</Text>
             </View>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleCancelQueue}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -178,7 +228,9 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={selectedStudent}
-                onValueChange={(itemValue) => setSelectedStudent(itemValue)}
+                onValueChange={(itemValue) => {
+                  setSelectedStudent(itemValue);
+                }}
                 style={[styles.picker, { color: '#ccc' }]}
               >
                 <Picker.Item label="Select Student" value="" color="#fff" />
@@ -217,33 +269,28 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <Picker
                 selectedValue={selectedConcern}
                 onValueChange={(itemValue) => setSelectedConcern(itemValue)}
-                style={[styles.picker, { color: '#ccc' }]}
+                style={styles.picker}
               >
-                <Picker.Item label="Select your concern" value="" color="#fff" />
-                <Picker.Item label="Concern A" value="concernA" color="#fff" />
-                <Picker.Item label="Concern B" value="concernB" color="#fff" />
+                <Picker.Item label="Select Concern" value="" />
+                <Picker.Item label="Grades" value="Grades" />
+                <Picker.Item label="Enrolment" value="Enrolment" />
+                <Picker.Item label="Others" value="Other" />
               </Picker>
             </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Other concern:"
-              placeholderTextColor="#ccc"
-              value={otherConcern}
-              onChangeText={(text) => setOtherConcern(text)}
-            />
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={styles.submitButton} 
-                onPress={handleRequest}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Request</Text>
-                )}
+            {selectedConcern === 'Others' && (
+              <TextInput
+                style={styles.input}
+                placeholder="Describe your concern"
+                placeholderTextColor="#aaa"
+                value={otherConcern}
+                onChangeText={setOtherConcern}
+              />
+            )}
+            <View style={styles.buttonsContainer}>
+              <TouchableOpacity style={styles.requestButton} onPress={handleRequest}>
+                <Text style={styles.buttonText}>Request</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -274,91 +321,98 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerText: {
-    fontSize: 48,
+    fontSize: 35,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#f3f3f3',
+    marginBottom: 20,
   },
   subHeaderText: {
-    fontSize: 20,
-    color: '#fff',
+    color: '#f3f3f3',
   },
   ticketDetails: {
-    marginVertical: 20,
-    padding: 10,
-    backgroundColor: '#005C12',
-    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
     width: '100%',
   },
   ticketLabel: {
+    color: '#f3f3f3',
     fontSize: 14,
-    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
   ticketNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
     color: '#fff',
+    fontSize: 30,
+    fontWeight: 'bold',
+    marginBottom: 15,
   },
   ticketInfoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    width: '100%',
+    marginVertical: 20,
   },
   ticketInfo: {
-    fontSize: 14,
-    color: '#fff',
+    color: '#f3f3f3',
+    fontSize: 18,
   },
   waitText: {
-    fontSize: 18,
-    color: '#fff',
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#D32F2F',
-    padding: 10,
-    marginTop: 20,
-    borderRadius: 5,
-  },
-  buttonText: {
+    color: '#f3f3f3',
     fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 20,
+  },
+  
+  buttonText: {
     color: '#fff',
+    fontSize: 18,
   },
   formGroup: {
-    marginTop: 10,
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
   pickerContainer: {
+    width: "100%",
+    height: 50,
+    backgroundColor: "#2e4f2e",
+    borderRadius: 5,
+    justifyContent: "center",
     marginBottom: 15,
+    overflow: "hidden",
   },
   picker: {
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 4,
-    color: '#ccc',
-    backgroundColor: '#1b5e20',
+    borderColor: "#2e4f2e",
+    backgroundColor: "#2e4f2e",
+    color: "#fff",
+    width: "100%",
+    fontSize: 16,
   },
   input: {
-    height: 100,
-    backgroundColor: '#1b5e20',
+    backgroundColor: '#333',
     color: '#fff',
-    borderRadius: 4,
-    paddingHorizontal: 10,
-    marginBottom: 20,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  submitButton: {
-    backgroundColor: '#388E3C',
     padding: 10,
-    width: '48%',
+    marginBottom: 20,
+    borderRadius: 5,
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly', // Ensures equal space between the buttons
+    width: '100%',
+    marginTop: 20,
+  },
+  requestButton: {
+    backgroundColor: '#007AFF',
     borderRadius: 5,
     alignItems: 'center',
+    paddingVertical: 12,
+    width: '48%', // Adjust width if necessary
   },
   closeButton: {
-    backgroundColor: '#757575',
-    padding: 10,
-    width: '48%',
+    backgroundColor: '#FF5C5C',
+    paddingVertical: 12,
     borderRadius: 5,
+    width: '48%', // Adjust width if necessary
     alignItems: 'center',
   },
 });
