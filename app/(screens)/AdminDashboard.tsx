@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   },
   content: { 
     flex: .92, 
-    backgroundColor: "#4CAF50" 
+    backgroundColor: "#4CAF50",
   },
   FacultyList: { 
     flex: 1 ,

@@ -94,12 +94,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginBox: {
-    width: 400,
-    height: 300,
+    width: "25%",
+    height: "30%",
     backgroundColor: '#000',
     padding: 20,
     borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     opacity: 0.8,  
   },
   title: {
