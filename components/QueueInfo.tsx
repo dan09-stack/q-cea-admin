@@ -32,9 +32,9 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
         <TouchableOpacity style={styles.button} onPress={onAddStudent}>
           <Text style={styles.buttonText}>ADD STUDENT</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={onAddAdmin}>
+        {/* <TouchableOpacity style={styles.button} onPress={onAddAdmin}>
           <Text style={styles.buttonText}>ADD Q-CEA ADMIN</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );
