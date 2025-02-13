@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native';
-import firebase from '../firebaseConfig'; // Importing default firebase config
+import { useRouter } from 'expo-router'; // Import Expo Router
+import firebase from '../firebaseConfig'; // Import Firebase config
 import { collection, getDocs, addDoc, doc, setDoc, query, limit } from 'firebase/firestore'; // Import Firestore methods
 
 const Profile: React.FC = () => {
+  const router = useRouter(); // Initialize router
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
     name: '',
@@ -17,7 +19,6 @@ const Profile: React.FC = () => {
 
   const firestore = firebase.firestore(); // Access Firestore instance
 
-  // Fetch the first document from the 'admin' collection
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -46,11 +47,10 @@ const Profile: React.FC = () => {
       setIsSaving(true);
       const snapshot = await getDocs(query(collection(firestore, 'admin'), limit(1)));
       if (!snapshot.empty) {
-        const docId = snapshot.docs[0].id; // Get the document ID
-        await setDoc(doc(firestore, 'admin', docId), profileData); // Update the document
+        const docId = snapshot.docs[0].id;
+        await setDoc(doc(firestore, 'admin', docId), profileData);
         console.log('Profile data saved successfully');
       } else {
-        // If no document exists, create a new one
         await addDoc(collection(firestore, 'admin'), profileData);
         console.log('Profile data created successfully');
       }
@@ -61,20 +61,8 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleEditPress = () => {
-    setIsEditing(true);
-  };
-
-  const handleSavePress = async () => {
-    setIsEditing(false);
-    await saveProfileToFirebase();
-  };
-
-  const handleChange = (key: string, value: string) => {
-    setProfileData((prevData) => ({
-      ...prevData,
-      [key]: value,
-    }));
+  const handleLogout = () => {
+    router.replace('/'); // Navigate back to index.tsx
   };
 
   if (loading) {
@@ -87,6 +75,10 @@ const Profile: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={handleLogout}>
+        <Text style={styles.backButtonText}>← Logout</Text>
+      </TouchableOpacity>
+
       <View style={styles.card}>
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
@@ -96,74 +88,13 @@ const Profile: React.FC = () => {
             />
           </View>
           <View style={styles.infoSection}>
-            {isEditing ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  value={profileData.name}
-                  onChangeText={(text) => handleChange('name', text)}
-                  placeholder="Name"
-                />
-                <TextInput
-                  style={styles.input}
-                  value={profileData.id}
-                  onChangeText={(text) => handleChange('id', text)}
-                  placeholder="ID #"
-                />
-                <TextInput
-                  style={styles.input}
-                  value={profileData.phone}
-                  onChangeText={(text) => handleChange('phone', text)}
-                  placeholder="Phone #"
-                  keyboardType="phone-pad"
-                />
-                <TextInput
-                  style={styles.input}
-                  value={profileData.email}
-                  onChangeText={(text) => handleChange('email', text)}
-                  placeholder="Email"
-                  keyboardType="email-address"
-                />
-                <TextInput
-                  style={styles.input}
-                  value={profileData.password}
-                  onChangeText={(text) => handleChange('password', text)}
-                  placeholder="Password"
-                  secureTextEntry
-                />
-              </>
-            ) : (
-              <>
-                <Text style={styles.infoText}>
-                  Name: <Text style={styles.valueText}>{profileData.name}</Text>
-                </Text>
-                <Text style={styles.infoText}>
-                  ID #: <Text style={styles.valueText}>{profileData.id}</Text>
-                </Text>
-                <Text style={styles.infoText}>
-                  Phone #: <Text style={styles.valueText}>{profileData.phone}</Text>
-                </Text>
-                <Text style={styles.infoText}>
-                  Email: <Text style={styles.valueText}>{profileData.email}</Text>
-                </Text>
-                <Text style={styles.infoText}>
-                  Password: <Text style={styles.valueText}>{profileData.password}</Text>
-                </Text>
-              </>
-            )}
+            <Text style={styles.infoText}>Name: <Text style={styles.valueText}>{profileData.name}</Text></Text>
+            <Text style={styles.infoText}>ID #: <Text style={styles.valueText}>{profileData.id}</Text></Text>
+            <Text style={styles.infoText}>Phone #: <Text style={styles.valueText}>{profileData.phone}</Text></Text>
+            <Text style={styles.infoText}>Email: <Text style={styles.valueText}>{profileData.email}</Text></Text>
+            <Text style={styles.infoText}>Password: <Text style={styles.valueText}>{profileData.password}</Text></Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={isEditing ? handleSavePress : handleEditPress}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.editText}>{isEditing ? 'Save' : 'Edit'}</Text>
-          )}
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -176,6 +107,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    backgroundColor: '#ff4c4c',
+    padding: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   card: {
     backgroundColor: '#0c3915',
@@ -216,24 +160,6 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   valueText: {
-    fontWeight: 'bold',
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 5,
-  },
-  editButton: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#1c6625',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  editText: {
-    color: '#ffffff',
-    fontSize: 16,
     fontWeight: 'bold',
   },
 });
