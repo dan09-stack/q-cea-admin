@@ -6,10 +6,10 @@ import Profile from '@/components/Profile';
 import Statistics from '@/components/Statistics';
 import AddStudent from "@/components/AddStudent";
 import AddQueue from "@/components/AddQueue";
-import AddAdmin from "@/components/AddAdmin";
+import AddAdmin from "@/components/VerifyFaculty";
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
-import AddAdminScreen from "@/components/AddAdmin";
+import AddAdminScreen from "@/components/VerifyFaculty";
 
 const AdminDashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState('faculty'); // Default view is 'faculty'
@@ -39,7 +39,7 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={() => setCurrentView('addAdmin')}
+              onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
@@ -50,18 +50,18 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={() => setCurrentView('addAdmin')}
+              onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
           </View>
-        ) : currentView === 'addAdmin' ? (
+        ) : currentView === 'verifyFaculty' ? (
           <View style={styles.facultyContainer}>
             <AddAdmin onClose={() => setCurrentView('faculty')} />
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={() => setCurrentView('addAdmin')}
+              onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />
@@ -74,7 +74,7 @@ const AdminDashboard: React.FC = () => {
               onAddStudent={() => setCurrentView('addStudent')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
-              onAddAdmin={() => setShowAddAdmin(true)}
+              onVerifyFaculty={() => setCurrentView('verifyFaculty')}
             />
           </View>
         ) : currentView === 'profile' ? (
@@ -87,7 +87,7 @@ const AdminDashboard: React.FC = () => {
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
-              onAddAdmin={() => setCurrentView('addAdmin')}
+              onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
             />

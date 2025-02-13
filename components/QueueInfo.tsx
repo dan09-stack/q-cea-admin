@@ -1,12 +1,12 @@
 // QueueInfo.tsx
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import firebase from "@/firebaseConfig"; // Import Firebase config
-
+import firebase, { db } from "@/firebaseConfig"; // Import Firebase config
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 interface QueueInfoProps {
   onAddFaculty: () => void;
   onAddStudent: () => void;
-  onAddAdmin: () => void;
+  onVerifyFaculty: () => void;
   onAddQueue: () => void;
   onViewRatings: () => void;
   
@@ -15,16 +15,22 @@ interface QueueInfoProps {
 const QueueInfo: React.FC<QueueInfoProps> = ({
   onAddFaculty,
   onAddStudent,
-  onAddAdmin,
+  onVerifyFaculty,
   onAddQueue,
   onViewRatings,
   
 }) => {
   const [queueCount, setQueueCount] = useState<number>(0); // State to store queue count
+  const [unverifiedCount, setUnverifiedCount] = useState<number>(0);
 
   useEffect(() => {
     const studentRef = firebase.firestore().collection("student");
-
+    const facultyRef = collection(db, "student");
+    const unverifiedQuery = query(facultyRef, where("isVerified", "==", false));
+    
+    const unsubscribeUnverified = onSnapshot(unverifiedQuery, (snapshot) => {
+      setUnverifiedCount(snapshot.size);
+    });
     // Real-time fetch queueCount from Firestore where status is "waiting"
     const unsubscribe = studentRef
       .where("status", "==", "waiting")
@@ -53,11 +59,18 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
       <TouchableOpacity onPress={onAddStudent}>
         <Text style={styles.button}>Add Student</Text>
       </TouchableOpacity>
-      {/* <TouchableOpacity onPress={onAddAdmin}>
-        <Text style={styles.button}>Add Admin</Text>
-      </TouchableOpacity> */}
       <TouchableOpacity onPress={onAddQueue}>
         <Text style={styles.button}>Add Queue</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onVerifyFaculty}>
+        <Text style={styles.button}>
+          Verify Faculty Account{' '}
+          {unverifiedCount > 0 && (
+            <Text style={{ color: '#FF0000', fontWeight: 'bold' }}>
+              ({unverifiedCount})
+            </Text>
+          )}
+        </Text>
       </TouchableOpacity>
     </View>
   );
