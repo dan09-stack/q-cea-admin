@@ -1,72 +1,149 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import firebase from '@/firebaseConfig'; // Import your Firebase configuration
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import firebase from '../firebaseConfig';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
 
 const Profile: React.FC = () => {
-  const [adminData, setAdminData] = useState<any>(null);
+  const router = useRouter();
+  const [profileData, setProfileData] = useState({
+    name: '',
+    id: '',
+    phone: '',
+    email: '',
+    password: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const firestore = firebase.firestore();
 
-  // Fetch data from the 'admin1' document in the 'admin' collection
   useEffect(() => {
-    const fetchAdminData = async () => {
+    const fetchData = async () => {
       try {
-        const adminRef = firebase.firestore().collection('admin').doc('admin1'); // Get the admin1 document
+        const adminRef = firebase.firestore().collection('admin').doc('admin1');
         const docSnapshot = await adminRef.get();
+        
         if (docSnapshot.exists) {
-          setAdminData(docSnapshot.data()); // Set data from the 'admin1' document
-        } else {
-          console.log('No admin1 data found');
+          const data = docSnapshot.data();
+          setProfileData({
+            name: data?.name || '',
+            id: data?.id || '',
+            phone: data?.phone || '',
+            email: data?.email || '',
+            password: data?.password || '',
+          });
         }
       } catch (error) {
-        console.error('Error fetching admin data: ', error);
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchAdminData();
+    fetchData();
   }, []);
+
+  const handleLogout = () => {
+    router.replace('/');
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.GreenContainer}>
+      <TouchableOpacity style={styles.backButton} onPress={handleLogout}>
+        <Text style={styles.backButtonText}>← Logout</Text>
+      </TouchableOpacity>
 
-        {adminData ? (
-          <>
-            <Text style={styles.queueTitle}>Name: {adminData.name}</Text>
-            <Text style={styles.queueTitle}>ID #: {adminData.id}</Text>
-            <Text style={styles.queueTitle}>Phone #: {adminData.phone}</Text>
-            <Text style={styles.queueTitle}>Email: {adminData.email}</Text>
-            <Text style={styles.queueTitle}>Password: {adminData.password}</Text>
-          </>
-        ) : (
-          <Text style={styles.queueTitle}>Loading...</Text>
-        )}
+      <View style={styles.card}>
+        <View style={styles.profileSection}>
+          <View style={styles.avatar}>
+            <Image
+              style={styles.avatarImage}
+              source={{ uri: 'https://via.placeholder.com/50' }}
+            />
+          </View>
+          <View style={styles.infoSection}>
+            <Text style={styles.infoText}>Name: <Text style={styles.valueText}>{profileData.name}</Text></Text>
+            <Text style={styles.infoText}>ID #: <Text style={styles.valueText}>{profileData.id}</Text></Text>
+            <Text style={styles.infoText}>Phone #: <Text style={styles.valueText}>{profileData.phone}</Text></Text>
+            <Text style={styles.infoText}>Email: <Text style={styles.valueText}>{profileData.email}</Text></Text>
+            <Text style={styles.infoText}>Password: <Text style={styles.valueText}>{profileData.password}</Text></Text>
+          </View>
+        </View>
       </View>
     </View>
   );
 };
 
+export default Profile;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#4CAF50', // Same green background color as QueueInfo
-    justifyContent: 'center', // Centering content
-    alignItems: 'center', // Centering content horizontally
-  
-  },
-  GreenContainer: {
-    backgroundColor: '#0d3310', // Same dark green background as QueueInfo
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: '#a5d653',
     justifyContent: 'center',
     alignItems: 'center',
-    width: '50%'
+    padding: 20,
   },
-  queueTitle: {
-    fontSize: 18, // Adjusted for better readability
-    color: '#fff', // White text color
-    marginBottom: 12, // Added margin between fields
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    backgroundColor: '#ff4c4c',
+    padding: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  card: {
+    backgroundColor: '#0c3915',
+    width: '90%',
+    borderRadius: 15,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  avatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  infoSection: {
+    flex: 1,
+  },
+  infoText: {
+    color: '#ffffff',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  valueText: {
+    fontWeight: 'bold',
   },
 });
 
-export default Profile;
+
