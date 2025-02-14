@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, TextInput, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, TextInput, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { verifyAdminCredentials } from './services/adminAuth';
+import { verifyAdminCredentials, resetAdminPassword } from './services/adminAuth';
 
 const LoginScreen = () => {
   const router = useRouter();
@@ -9,16 +9,21 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage('Please enter a valid email and password.');
+      return;
+    }
+  
     try {
       setLoading(true);
       setErrorMessage('');
-      
+  
       const result = await verifyAdminCredentials(email, password);
-      
+  
       if (result.success) {
-        // Store admin data in secure storage if needed
         router.push('/(screens)/AdminDashboard');
       } else {
         setErrorMessage(result.error || 'Invalid credentials');
@@ -28,7 +33,35 @@ const LoginScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  };  
+
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email first.');
+      return;
+    }
+  
+    try {
+      setResetLoading(true);
+      
+      // Generate a random password
+      const newPassword = Math.random().toString(36).slice(-8);
+      
+      // Call reset function with email and new password
+      const result = await resetAdminPassword(email, newPassword);
+      
+      if (result.success) {
+        Alert.alert('Password Reset', `Your new password is: ${newPassword}`);
+      } else {
+        Alert.alert('Error', result.error || 'Password reset failed.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Try again.');
+    } finally {
+      setResetLoading(false);
+    }
+  };  
 
   return (
     <View style={[styles.container, { pointerEvents: 'auto' }]}>
@@ -63,8 +96,11 @@ const LoginScreen = () => {
           )}
         </TouchableOpacity>
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-        <TouchableOpacity>
-          <Text style={styles.forgotPassword}>Forgot your password?</Text>
+        
+        <TouchableOpacity onPress={handleForgotPassword} disabled={resetLoading}>
+          <Text style={styles.forgotPassword}>
+            {resetLoading ? 'Resetting password...' : 'Forgot your password?'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -79,7 +115,6 @@ const styles = StyleSheet.create({
   },
   loginBox: {
     width: 400,
-    height: 300,
     backgroundColor: '#000',
     padding: 20,
     borderRadius: 10,
@@ -122,23 +157,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textDecorationLine: 'underline',
   },
-  adminButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#000',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  adminText: {
-    color: '#fff',
-    fontSize: 12,
-  },
   buttonDisabled: {
     opacity: 0.7,
-  }
+  },
 });
-
 
 export default LoginScreen;
