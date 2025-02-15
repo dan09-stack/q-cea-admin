@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router'; // Import Expo Router
-import firebase from '../firebaseConfig'; // Import Firebase config
-import { collection, getDocs, addDoc, doc, setDoc, query, limit } from 'firebase/firestore'; // Import Firestore methods
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import firebase from '../firebaseConfig';
+import { collection, getDocs, doc, setDoc, query, limit } from 'firebase/firestore';
 
 const Profile: React.FC = () => {
-  const router = useRouter(); // Initialize router
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
     name: '',
@@ -17,7 +17,7 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const firestore = firebase.firestore(); // Access Firestore instance
+  const firestore = firebase.firestore();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -42,27 +42,26 @@ const Profile: React.FC = () => {
     fetchProfile();
   }, [firestore]);
 
-  const saveProfileToFirebase = async () => {
+  const handleSaveProfile = async () => {
     try {
       setIsSaving(true);
       const snapshot = await getDocs(query(collection(firestore, 'admin'), limit(1)));
       if (!snapshot.empty) {
         const docId = snapshot.docs[0].id;
         await setDoc(doc(firestore, 'admin', docId), profileData);
-        console.log('Profile data saved successfully');
-      } else {
-        await addDoc(collection(firestore, 'admin'), profileData);
-        console.log('Profile data created successfully');
+        Alert.alert('Success', 'Profile updated successfully!');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
+      Alert.alert('Error', 'Failed to save profile.');
     } finally {
+      setIsEditing(false);
       setIsSaving(false);
     }
   };
 
   const handleLogout = () => {
-    router.replace('/'); // Navigate back to index.tsx
+    router.replace('/');
   };
 
   if (loading) {
@@ -75,10 +74,12 @@ const Profile: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* Logout Button */}
       <TouchableOpacity style={styles.backButton} onPress={handleLogout}>
         <Text style={styles.backButtonText}>← Logout</Text>
       </TouchableOpacity>
 
+      {/* Profile Card */}
       <View style={styles.card}>
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
@@ -88,12 +89,33 @@ const Profile: React.FC = () => {
             />
           </View>
           <View style={styles.infoSection}>
-            <Text style={styles.infoText}>Name: <Text style={styles.valueText}>{profileData.name}</Text></Text>
-            <Text style={styles.infoText}>ID #: <Text style={styles.valueText}>{profileData.id}</Text></Text>
-            <Text style={styles.infoText}>Phone #: <Text style={styles.valueText}>{profileData.phone}</Text></Text>
-            <Text style={styles.infoText}>Email: <Text style={styles.valueText}>{profileData.email}</Text></Text>
-            <Text style={styles.infoText}>Password: <Text style={styles.valueText}>{profileData.password}</Text></Text>
+            {Object.keys(profileData).map((key) => (
+              <View key={key} style={styles.inputGroup}>
+                <Text style={styles.infoText}>{key.charAt(0).toUpperCase() + key.slice(1)}:</Text>
+                {isEditing ? (
+                  <TextInput
+                    style={styles.input}
+                    value={profileData[key as keyof typeof profileData]}
+                    onChangeText={(text) => setProfileData({ ...profileData, [key]: text })}
+                  />
+                ) : (
+                  <Text style={styles.valueText}>{profileData[key as keyof typeof profileData]}</Text>
+                )}
+              </View>
+            ))}
           </View>
+        </View>
+
+        {/* Edit & Save Buttons (Inside Profile Card) */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(!isEditing)}>
+            <Text style={styles.editButtonText}>{isEditing ? 'Cancel' : 'Edit'}</Text>
+          </TouchableOpacity>
+          {isEditing && (
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile} disabled={isSaving}>
+              <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>
@@ -131,6 +153,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+    marginTop: 80,
   },
   profileSection: {
     flexDirection: 'row',
@@ -154,12 +177,50 @@ const styles = StyleSheet.create({
   infoSection: {
     flex: 1,
   },
+  inputGroup: {
+    marginBottom: 10,
+  },
   infoText: {
     color: '#ffffff',
     fontSize: 16,
     marginBottom: 5,
   },
   valueText: {
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  input: {
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 5,
+    fontSize: 16,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+  },
+  editButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
