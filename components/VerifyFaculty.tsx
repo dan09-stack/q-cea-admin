@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  TextInput,
 } from "react-native";
 import { db } from "../firebaseConfig";
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
@@ -19,6 +20,9 @@ interface UnverifiedUser {
 }
 
 const AddAdmin: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [rfidInput, setRfidInput] = useState<string>("");
+const [selectedUserId, setSelectedUserId] = useState<string>("");
+
   const [unverifiedUsers, setUnverifiedUsers] = useState<UnverifiedUser[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
@@ -46,19 +50,25 @@ const AddAdmin: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   }, []);
 
   const handleVerify = async (userId: string) => {
+    setSelectedUserId(userId);
+    setRfidInput(""); // Reset RFID input
+    setModalVisible(true);
+  };
+  const completeVerification = async () => {
     try {
-      const userRef = doc(db, 'student', userId);
+      const userRef = doc(db, 'student', selectedUserId);
       await updateDoc(userRef, {
-        isVerified: true
+        isVerified: true,
+        rfid_uid: rfidInput
       });
       setModalMessage("User verified successfully!");
-      setModalVisible(true);
+      setTimeout(() => {
+        setModalVisible(false);
+      }, 2000);
     } catch (error) {
       setModalMessage("Failed to verify user. Please try again.");
-      setModalVisible(true);
     }
   };
-
   return (
     <View style={styles.container}>
     <Text style={styles.title}>Unverified Users</Text>
@@ -85,27 +95,82 @@ const AddAdmin: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       )}
     </ScrollView>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalView}>
-          <Text style={styles.modalText}>{modalMessage}</Text>
+    <Modal
+  animationType="fade"
+  transparent={true}
+  visible={modalVisible}
+  onRequestClose={() => setModalVisible(false)}
+>
+  <View style={styles.modalView}>
+    {!modalMessage ? (
+      <>
+        <Text style={styles.modalText}>Enter RFID UID</Text>
+        <TextInput
+          style={styles.input}
+          value={rfidInput}
+          onChangeText={setRfidInput}
+          placeholder="Scan or enter RFID UID"
+          placeholderTextColor="#666"
+        />
+        <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[styles.button, styles.verifyButton]}
+            onPress={completeVerification}
+          >
+            <Text style={styles.buttonText}>Confirm</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton]}
             onPress={() => setModalVisible(false)}
           >
-            <Text style={styles.buttonText}>Close</Text>
+            <Text style={styles.buttonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
-      </Modal>
+      </>
+    ) : (
+      <>
+        <Text style={styles.modalText}>{modalMessage}</Text>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={() => {
+            setModalVisible(false);
+            setModalMessage("");
+          }}
+        >
+          <Text style={styles.buttonText}>Close</Text>
+        </TouchableOpacity>
+      </>
+    )}
+  </View>
+    </Modal>
+
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  input: {
+    backgroundColor: '#fff',
+    width: '100%',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 15,
+    color: '#000',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  button: {
+    padding: 10,
+    borderRadius: 5,
+    width: '45%',
+  },
+ 
+  cancelButton: {
+    backgroundColor: '#791010',
+  },
   container: {
     marginTop: 50,
     margin: 20,
