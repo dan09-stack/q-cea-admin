@@ -31,7 +31,13 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 // Track next ticket
 useEffect(() => {
-  if (!selectedFaculty) return;
+  console.log("Next Ticket Effect - Selected Faculty:", selectedFaculty);
+  console.log("Current Displayed Ticket:", currentDisplayedTicket);
+
+  if (!selectedFaculty) {
+    console.log("No faculty selected, returning");
+    return;
+  }
 
   const facultyQuery = firestoreQuery(
     collection(db, 'student'),
@@ -43,13 +49,12 @@ useEffect(() => {
   );
 
   const unsubscribe = onSnapshot(facultyQuery, (snapshot) => {
+    console.log("Next Ticket Query Results:", snapshot.docs.map(doc => doc.data()));
     if (!snapshot.empty) {
       const nextTicket = snapshot.docs[0].data();
+      console.log("Setting Next Ticket:", nextTicket);
       setNextDisplayedTicket(nextTicket.userTicketNumber);
       setNextDisplayedProgram(nextTicket.program);
-    } else {
-      setNextDisplayedTicket('');
-      setNextDisplayedProgram('');
     }
   });
 
@@ -58,17 +63,24 @@ useEffect(() => {
 
 // Track queue position
 useEffect(() => {
-  if (!selectedFaculty || !userTicketNumber) return;
+  console.log("Queue Position Effect - Selected Faculty:", selectedFaculty);
+  console.log("User Ticket Number:", userTicketNumber);
+
+  if (!selectedFaculty || !userTicketNumber) {
+    console.log("Missing required data, returning");
+    return;
+  }
 
   const queueQuery = firestoreQuery(
     collection(db, 'student'),
     firestoreWhere('faculty', '==', selectedFaculty),
+    firestoreWhere('status', '==', 'waiting'),
     firestoreWhere('userTicketNumber', '>', Number(currentDisplayedTicket)),
-    firestoreWhere('userTicketNumber', '<', Number(userTicketNumber)),
-    firestoreWhere('status', '==', 'waiting')
+    firestoreWhere('userTicketNumber', '<', Number(userTicketNumber))
   );
 
   const unsubscribe = onSnapshot(queueQuery, (snapshot) => {
+    console.log("Queue Position Results:", snapshot.size);
     setPeopleAhead(snapshot.size);
   });
 
