@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity, Platform } from "react-native";
 import { Picker } from '@react-native-picker/picker';
 import { auth, db } from '@/firebaseConfig';
 import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, onSnapshot, updateDoc, QueryConstraint,
@@ -28,6 +28,14 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [currentDisplayedTicket, setCurrentDisplayedTicket] = useState('');
   const [currentDisplayedProgram, setCurrentDisplayedProgram] = useState('');
   const [userProgram, setUserProgram] = useState('');
+
+const showAlert = (message: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(message);
+  } else {
+    Alert.alert(message);
+  }
+};
 
 // Track next ticket
 useEffect(() => {
@@ -178,13 +186,13 @@ useEffect(() => {
     console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);
   
     if (!selectedFaculty || !selectedStudent || (!selectedConcern && !otherConcern)) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showAlert('Please fill in all required fields');
       return;
     }
 
     const selectedFacultyData = facultyList.find(f => f.fullName === selectedFaculty);
     if (selectedFacultyData?.status !== 'ONLINE') {
-      console.log('Error', 'Selected faculty is not online');
+      showAlert('Selected faculty is not online');
       return;
     }
   
