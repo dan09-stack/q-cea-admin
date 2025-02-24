@@ -2,7 +2,10 @@ import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity } from "react-native";
 import { Picker } from '@react-native-picker/picker';
 import { auth, db } from '@/firebaseConfig';
-import { collection, doc, getDoc, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, onSnapshot, updateDoc, QueryConstraint,
+  WhereFilterOp } from 'firebase/firestore';
+import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
+import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 
 const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [selectedFaculty, setSelectedFaculty] = useState('');
@@ -16,31 +19,58 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [isCheckingRequest, setIsCheckingRequest] = useState(true);
   const [studentsList, setStudentsList] = useState<Array<{id: string, fullName: string}>>([]);
   const [selectedStudent, setSelectedStudent] = useState('');
+  const [concernsList, setConcernsList] = useState<string[]>([]);
+
 
   useEffect(() => {
     const currentUser = auth.currentUser;
     setIsCheckingRequest(true);
 
+  function query(facultyCollectionRef: CollectionReference<DocumentData>, condition: QueryConstraint) {
+    return firestoreQuery(facultyCollectionRef, condition);
+  }
+  
+  function where(field: string, operator: WhereFilterOp, value: any): QueryConstraint {
+    return firestoreWhere(field, operator, value);
+  }
+
+
+
     const studentsCollectionRef = collection(db, 'student');
-    const unsubscribeStudents = onSnapshot(studentsCollectionRef, (snapshot) => {
+    const studentsQuery = query(studentsCollectionRef, where('userType', '==', 'STUDENT'));
+    
+    const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
       const students = snapshot.docs.map(doc => ({
         id: doc.id,
         fullName: doc.data().fullName || ''
       }));
-      console.log("Students List: ", students);  // Log the students data
       setStudentsList(students);
     });
 
-    const facultyCollectionRef = collection(db, 'faculty');
-    const unsubscribeFaculty = onSnapshot(facultyCollectionRef, (snapshot) => {
-      const faculty = snapshot.docs.map(doc => ({
+
+    const facultyCollectionRef = collection(db, 'student');
+    const facultyQuery = query(facultyCollectionRef, where('userType', '==', 'FACULTY')) as Query<DocumentData>;
+    
+    const unsubscribeFaculty = onSnapshot(facultyQuery, (snapshot: QuerySnapshot<DocumentData>) => {
+      const faculty = snapshot.docs.map((doc: DocumentSnapshot<DocumentData>) => ({
         id: doc.id,
-        fullName: doc.data().fullName || '',
-        status: doc.data().status || 'OFFLINE'
+        fullName: doc.data()?.fullName || '',
+        status: doc.data()?.status || 'OFFLINE'
       }));
-      console.log("Faculty List: ", faculty);  // Log the faculty data
       setFacultyList(faculty);
     });
+
+    const concernDoc = doc(db, 'admin', 'concern');
+    const unsubscribeConcerns = onSnapshot(concernDoc, (doc) => {
+      console.log("Document exists:", doc.exists());
+      console.log("Full document data:", doc.data());  
+      if (doc.exists()) {
+        const concerns = doc.data().concern || [];
+        console.log("Concerns List:", concerns); // Debug log
+        setConcernsList(concerns);
+      }
+    });
+    
 
     if (currentUser) {
       const userRef = doc(db, 'student', currentUser.uid);
@@ -68,81 +98,81 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       return () => {
         userUnsubscribe();
-        unsubscribeFaculty();
         ticketUnsubscribe();
+        unsubscribeFaculty();
         unsubscribeStudents();
+        unsubscribeConcerns();
       };
     } else {
       setIsCheckingRequest(false);
     }
 
-    return () => unsubscribeFaculty();
   }, []);
 
   const handleRequest = async () => {
-    console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);  // Log request details
-
-    if (!selectedFaculty) {
-      Alert.alert('Error', 'Please select a faculty');
+    console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);
+  
+    if (!selectedFaculty || !selectedStudent || (!selectedConcern && !otherConcern)) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-
-    if (!selectedConcern && !otherConcern) {
-      Alert.alert('Error', 'Please select a concern or provide details in the Other field');
-      return;
-    }
-
-    if (!selectedStudent) {
-      Alert.alert('Error', 'Please select a student');
-      return;
-    }
-
+  
     setIsLoading(true);
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        Alert.alert('Error', 'User not authenticated');
+      // First verify the selected student is a STUDENT
+      const studentVerifyQuery = firestoreQuery(
+        collection(db, 'student'),
+        firestoreWhere('userType', '==', 'STUDENT')
+      );
+
+      const studentVerifySnapshot = await getDocs(studentVerifyQuery);
+      const isStudent = studentVerifySnapshot.docs.some(doc => doc.id === selectedStudent);
+
+      if (!isStudent) {
+        Alert.alert('Error', 'Selected user is not a student');
         return;
       }
-
+  
+      // Get queue position for waiting STUDENTS only
+      const queueQuery = firestoreQuery(
+        collection(db, 'student'),
+        firestoreWhere('userType', '==', 'STUDENT'),
+        firestoreWhere('faculty', '==', selectedFaculty),
+        firestoreWhere('status', '==', 'waiting')
+      );
+      
+      const queueSnapshot = await getDocs(queueQuery);
+      const queuePosition = queueSnapshot.size + 1;
+  
       const ticketRef = doc(db, 'ticketNumberCounter', 'ticket');
       const ticketSnap = await getDoc(ticketRef);
-
+  
       if (ticketSnap.exists()) {
         const currentNumber = ticketSnap.data().ticketNum;
         const newNumber = currentNumber + 1;
-
-        console.log("New ticket number: ", newNumber);  // Log new ticket number
-
-        // Update the ticket number counter
+  
         await updateDoc(ticketRef, {
           ticketNum: newNumber
         });
-
-        const userRef = doc(db, 'student', currentUser.uid);
-        await updateDoc(userRef, {
+  
+        const studentRef = doc(db, 'student', selectedStudent);
+        await updateDoc(studentRef, {
           userTicketNumber: newNumber,
           faculty: selectedFaculty,
           concern: selectedConcern,
           otherConcern: otherConcern,
           requestDate: new Date(),
-          status: 'waiting'
+          status: 'waiting',
+          queuePosition: queuePosition
         });
-
+  
         setTicketNumber(newNumber);
         setIsRequested(true);
-
-        // Now, update the status of the selected student
-        console.log("Updating status of selected student: ", selectedStudent);  // Log the student ID
-        const studentRef = doc(db, 'student', selectedStudent);
-        await updateDoc(studentRef, {
-          status: 'waiting'
-        });
-        Alert.alert('Success', 'Student status updated to waiting');
+        Alert.alert('Success', `Queue position: ${queuePosition}`);
       }
     } catch (error) {
-      console.log('Error updating ticket number:', error);  // Log any errors
-      Alert.alert('Error', 'Failed to create ticket request');
+      console.log('Error updating queue:', error);
+      Alert.alert('Error', 'Failed to join queue');
     } finally {
       setIsLoading(false);
     }
@@ -150,44 +180,47 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   const handleCancelQueue = async () => {
     try {
-      // Get all students who are in 'waiting' status
-      const studentsCollectionRef = collection(db, 'student');
-      const querySnapshot = await getDocs(studentsCollectionRef);
+      console.log("Starting cancel queue for selected student:", selectedStudent);
       
-      // Find the student with matching ticket number
-      const studentToCancel = querySnapshot.docs.find(doc => 
-        doc.data().userTicketNumber === userTicketNumber
-      );
+      const studentsCollectionRef = collection(db, 'student');
+      const studentRef = doc(db, 'student', selectedStudent);
+      const studentDoc = await getDoc(studentRef);
+      
+      if (studentDoc.exists()) {
+        const studentData = studentDoc.data();
+        console.log("Student data found:", studentData);
+        
+        if (studentData.userType === 'STUDENT') {
+          await updateDoc(studentRef, {
+            status: 'cancelled',
+            userTicketNumber: null,
+            faculty: null,
+            concern: null,
+            otherConcern: null,
+            requestDate: null,
+            queuePosition: null
+          });
   
-      if (!studentToCancel) {
-        Alert.alert('Error', 'Could not find student ticket');
-        return;
+          setIsRequested(false);
+          setSelectedFaculty('');
+          setSelectedConcern('');
+          setOtherConcern('');
+          setUserTicketNumber('');
+  
+          Alert.alert('Success', 'Queue cancelled successfully');
+        } else {
+          Alert.alert('Error', 'Only student queues can be cancelled');
+        }
+      } else {
+        Alert.alert('Error', 'Could not find student');
       }
-  
-      // Update the student's record
-      const studentRef = doc(db, 'student', studentToCancel.id);
-      await updateDoc(studentRef, {
-        status: 'cancelled',
-        userTicketNumber: null,
-        faculty: null,
-        concern: null,
-        otherConcern: null,
-        requestDate: null
-      });
-  
-      // Reset local state
-      setIsRequested(false);
-      setSelectedFaculty('');
-      setSelectedConcern('');
-      setOtherConcern('');
-      setUserTicketNumber('');
-  
-      Alert.alert('Success', 'Queue cancelled successfully');
     } catch (error) {
-      console.error('Error cancelling queue:', error);
+      console.error('Error in cancel queue:', error);
       Alert.alert('Error', 'Failed to cancel the queue');
     }
   };
+  
+
   
   const handleCancel = () => {
     console.log("Cancel button pressed, closing the modal.");
@@ -266,26 +299,21 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </Picker>
             </View>
             <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={selectedConcern}
-                onValueChange={(itemValue) => setSelectedConcern(itemValue)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Concern" value="" />
-                <Picker.Item label="Grades" value="Grades" />
-                <Picker.Item label="Enrolment" value="Enrolment" />
-                <Picker.Item label="Others" value="Other" />
-              </Picker>
+            <Picker
+              selectedValue={selectedConcern}
+              onValueChange={(itemValue) => setSelectedConcern(itemValue)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select Concern" value="" />
+              {concernsList.length > 0 ? (
+                concernsList.map((concern, index) => (
+                  <Picker.Item key={index} label={concern} value={concern} />
+                ))
+              ) : (
+                <Picker.Item label="No concerns available" value="" />
+              )}
+            </Picker>
             </View>
-            {selectedConcern === 'Others' && (
-              <TextInput
-                style={styles.input}
-                placeholder="Describe your concern"
-                placeholderTextColor="#aaa"
-                value={otherConcern}
-                onChangeText={setOtherConcern}
-              />
-            )}
             <View style={styles.buttonsContainer}>
               <TouchableOpacity style={styles.requestButton} onPress={handleRequest}>
                 <Text style={styles.buttonText}>Request</Text>
@@ -418,3 +446,17 @@ const styles = StyleSheet.create({
 });
 
 export default AddQueue;
+
+
+//const userUnsubscribe = onSnapshot(userRef, (doc) => {
+ // if (doc.exists()) {
+  //  const userData = doc.data();
+  //  if (userData.status === 'waiting') {
+   //   setIsRequested(true);
+   // } else {
+   //   setIsRequested(false);  // This triggers when status changes to 'cancelled'
+    //}
+  //  setUserTicketNumber(userData.userTicketNumber);
+//  }
+//  setIsCheckingRequest(false);
+//});
