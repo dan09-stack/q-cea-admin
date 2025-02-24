@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
@@ -9,6 +10,9 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ navigation }) => {
+  const handleLogout = () => {
+    router.replace('/');
+  };
   return (
     <View style={styles.sidebar}>
       <TouchableOpacity onPress={() => navigation.navigate("Home")} style={styles.icon}>
@@ -23,7 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ navigation }) => {
       
       {/* Logout Icon at the bottom */}
       <View style={styles.spacer}></View>
-      <TouchableOpacity onPress={() => navigation.navigate("Logout")} style={styles.icon}>
+      <TouchableOpacity onPress={handleLogout} style={styles.icon}>
         <Icon name="log-out-outline" size={40} color="#fff" />
       </TouchableOpacity>
     </View>
