@@ -3,7 +3,9 @@ import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, To
 import { Picker } from '@react-native-picker/picker';
 import { auth, db } from '@/firebaseConfig';
 import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, onSnapshot, updateDoc, QueryConstraint,
-  WhereFilterOp } from 'firebase/firestore';
+  WhereFilterOp, 
+  orderBy,
+  limit} from 'firebase/firestore';
 import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 
@@ -20,24 +22,80 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [studentsList, setStudentsList] = useState<Array<{id: string, fullName: string}>>([]);
   const [selectedStudent, setSelectedStudent] = useState('');
   const [concernsList, setConcernsList] = useState<string[]>([]);
+  const [peopleAhead, setPeopleAhead] = useState(0);
+  const [nextDisplayedTicket, setNextDisplayedTicket] = useState('');
+  const [nextDisplayedProgram, setNextDisplayedProgram] = useState('');
+  const [currentDisplayedTicket, setCurrentDisplayedTicket] = useState('');
+  const [currentDisplayedProgram, setCurrentDisplayedProgram] = useState('');
+  const [userProgram, setUserProgram] = useState('');
 
+// Track next ticket
+useEffect(() => {
+  if (!selectedFaculty) return;
+
+  const facultyQuery = firestoreQuery(
+    collection(db, 'student'),
+    firestoreWhere('faculty', '==', selectedFaculty),
+    firestoreWhere('status', '==', 'waiting'),
+    firestoreWhere('userTicketNumber', '>', currentDisplayedTicket),
+    orderBy('userTicketNumber', 'asc'),
+    limit(1)
+  );
+
+  const unsubscribe = onSnapshot(facultyQuery, (snapshot) => {
+    if (!snapshot.empty) {
+      const nextTicket = snapshot.docs[0].data();
+      setNextDisplayedTicket(nextTicket.userTicketNumber);
+      setNextDisplayedProgram(nextTicket.program);
+    } else {
+      setNextDisplayedTicket('');
+      setNextDisplayedProgram('');
+    }
+  });
+
+  return () => unsubscribe();
+}, [currentDisplayedTicket, selectedFaculty]);
+
+// Track queue position
+useEffect(() => {
+  if (!selectedFaculty || !userTicketNumber) return;
+
+  const queueQuery = firestoreQuery(
+    collection(db, 'student'),
+    firestoreWhere('faculty', '==', selectedFaculty),
+    firestoreWhere('userTicketNumber', '>', Number(currentDisplayedTicket)),
+    firestoreWhere('userTicketNumber', '<', Number(userTicketNumber)),
+    firestoreWhere('status', '==', 'waiting')
+  );
+
+  const unsubscribe = onSnapshot(queueQuery, (snapshot) => {
+    setPeopleAhead(snapshot.size);
+  });
+
+  return () => unsubscribe();
+}, [userTicketNumber, currentDisplayedTicket, selectedFaculty]);
+  
+  useEffect(() => {
+    // Get user program
+    const getCurrentUserProgram = async () => {
+      if (selectedStudent) {
+        const studentRef = doc(db, 'student', selectedStudent);
+        const studentDoc = await getDoc(studentRef);
+        if (studentDoc.exists()) {
+          setUserProgram(studentDoc.data().program || '');
+        }
+      }
+    };
+  
+    getCurrentUserProgram();
+  }, [selectedStudent]);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
     setIsCheckingRequest(true);
-
-  function query(facultyCollectionRef: CollectionReference<DocumentData>, condition: QueryConstraint) {
-    return firestoreQuery(facultyCollectionRef, condition);
-  }
   
-  function where(field: string, operator: WhereFilterOp, value: any): QueryConstraint {
-    return firestoreWhere(field, operator, value);
-  }
-
-
-
     const studentsCollectionRef = collection(db, 'student');
-    const studentsQuery = query(studentsCollectionRef, where('userType', '==', 'STUDENT'));
+    const studentsQuery = firestoreQuery(studentsCollectionRef, firestoreWhere('userType', '==', 'STUDENT'));
     
     const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
       const students = snapshot.docs.map(doc => ({
@@ -46,35 +104,30 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       }));
       setStudentsList(students);
     });
-
-
+  
     const facultyCollectionRef = collection(db, 'student');
-    const facultyQuery = query(facultyCollectionRef, where('userType', '==', 'FACULTY')) as Query<DocumentData>;
+    const facultyQuery = firestoreQuery(facultyCollectionRef, firestoreWhere('userType', '==', 'FACULTY'));
     
-    const unsubscribeFaculty = onSnapshot(facultyQuery, (snapshot: QuerySnapshot<DocumentData>) => {
-      const faculty = snapshot.docs.map((doc: DocumentSnapshot<DocumentData>) => ({
+    const unsubscribeFaculty = onSnapshot(facultyQuery, (snapshot) => {
+      const faculty = snapshot.docs.map((doc) => ({
         id: doc.id,
-        fullName: doc.data()?.fullName || '',
-        status: doc.data()?.status || 'OFFLINE'
+        fullName: doc.data().fullName || '',
+        status: doc.data().status || 'OFFLINE'
       }));
       setFacultyList(faculty);
     });
-
+  
     const concernDoc = doc(db, 'admin', 'concern');
     const unsubscribeConcerns = onSnapshot(concernDoc, (doc) => {
-      console.log("Document exists:", doc.exists());
-      console.log("Full document data:", doc.data());  
       if (doc.exists()) {
         const concerns = doc.data().concern || [];
-        console.log("Concerns List:", concerns); // Debug log
         setConcernsList(concerns);
       }
     });
-    
-
-    if (currentUser) {
-      const userRef = doc(db, 'student', currentUser.uid);
-      const userUnsubscribe = onSnapshot(userRef, (doc) => {
+  
+    if (selectedStudent) {
+      const studentRef = doc(db, 'student', selectedStudent);
+      const userUnsubscribe = onSnapshot(studentRef, (doc) => {
         if (doc.exists()) {
           const userData = doc.data();
           console.log("User Data: ", userData);  // Log the user data
@@ -87,7 +140,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         }
         setIsCheckingRequest(false);
       });
-
+  
       const ticketRef = doc(db, 'ticketNumberCounter', 'ticket');
       const ticketUnsubscribe = onSnapshot(ticketRef, (doc) => {
         if (doc.exists()) {
@@ -95,7 +148,7 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           setTicketNumber(doc.data().ticketNum);
         }
       });
-
+  
       return () => {
         userUnsubscribe();
         ticketUnsubscribe();
@@ -106,14 +159,20 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     } else {
       setIsCheckingRequest(false);
     }
-
-  }, []);
+  
+  }, [selectedStudent]); // Add selectedStudent as a dependency
 
   const handleRequest = async () => {
     console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);
   
     if (!selectedFaculty || !selectedStudent || (!selectedConcern && !otherConcern)) {
       Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    const selectedFacultyData = facultyList.find(f => f.fullName === selectedFaculty);
+    if (selectedFacultyData?.status !== 'ONLINE') {
+      console.log('Error', 'Selected faculty is not online');
       return;
     }
   
@@ -234,27 +293,48 @@ const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <ActivityIndicator size="large" color="#004000" />
       ) : (
         isRequested ? (
-          <View style={styles.ticketContainer}>
-            <Text style={styles.headerText}>{ticketNumber}</Text>
-            <Text style={styles.subHeaderText}>People in front of you: 2</Text>
+          <View style={[styles.ticketContainer, {width: '100%'}]}>
+            <Text style={[styles.subHeaderText, {fontWeight: 'bold'}]}>
+              People in front of you: {peopleAhead}
+            </Text>
             <View style={styles.ticketDetails}>
-              <Text style={styles.ticketLabel}>YOUR TICKET NUMBER</Text>
-              <Text style={styles.ticketNumber}>{`CPE-${String(userTicketNumber).padStart(4, '0')}`}</Text>
+              <Text style={[styles.ticketLabel, { color: '#d9ab0e', fontWeight: 'bold', fontSize: 22}]}>
+                YOUR TICKET NUMBER
+              </Text>
+              <Text style={[styles.ticketNumber, { fontSize: 25, marginBottom: 20}]}>
+                {`${userProgram}-${String(userTicketNumber).padStart(4, '0')}`}
+              </Text>
               <View style={styles.ticketInfoContainer}>
                 <View>
-                  <Text style={styles.ticketLabel}>NEXT SERVING</Text>
-                  <Text style={styles.ticketInfo}>ECE-0009</Text>
+                  <Text style={[styles.ticketLabel, { color: '#000000', fontWeight: 'bold', fontSize: 16 }]}>
+                    NEXT SERVING
+                  </Text>
+                  <Text style={[styles.ticketInfo, {fontSize: 20}]}>
+                    {nextDisplayedTicket 
+                      ? `${nextDisplayedProgram}-${String(nextDisplayedTicket).padStart(4, '0')}`
+                      : 'No Next Ticket'
+                    }
+                  </Text>
                 </View>
                 <View>
-                  <Text style={styles.ticketLabel}>NOW SERVING</Text>
-                  <Text style={styles.ticketInfo}>ARC-0008</Text>
+                  <Text style={[styles.ticketLabel, { color: '#000000', fontWeight: 'bold', fontSize: 16 }]}>
+                    NOW SERVING
+                  </Text>
+                  <Text style={[styles.ticketInfo, {fontSize: 20}]}>
+                    {currentDisplayedTicket
+                      ? `${currentDisplayedProgram}-${String(currentDisplayedTicket).padStart(4, '0')}`
+                      : 'No ticket displayed'
+                    }
+                  </Text>
                 </View>
               </View>
-              <Text style={styles.waitText}>PLEASE WAIT</Text>
+              <Text style={[styles.waitText, { marginTop: 30, marginBottom: -10, fontSize: 23}]}>
+                {userTicketNumber === currentDisplayedTicket ? "YOUR TURN" : "PLEASE WAIT"}
+              </Text>
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={handleCancelQueue}>
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              <Button title="CANCEL" onPress={handleCancelQueue} color="#c8c4c4" />
+            </View>
           </View>
         ) : (
           <View style={styles.formGroup}>
@@ -390,7 +470,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 20,
   },
-  
+  buttonContainer: {
+    marginTop: 30,
+    width: '100%',
+    borderRadius: 5,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    },
   buttonText: {
     color: '#fff',
     fontSize: 18,
