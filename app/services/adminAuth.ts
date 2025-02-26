@@ -25,9 +25,9 @@ export const verifyAdminCredentials = async (email: string, password: string) =>
 };
 
 /**
- * Resets the admin password by updating it in Firestore.
+ * Resets the admin password to "admin" by updating it in Firestore.
  */
-export const resetAdminPassword = async (email: string, newPassword: string) => {
+export const resetAdminPassword = async (email: string) => {
   try {
     const adminRef = collection(db, 'admin');
     const q = query(adminRef, where('email', '==', email));
@@ -37,10 +37,10 @@ export const resetAdminPassword = async (email: string, newPassword: string) => 
       const adminDoc = querySnapshot.docs[0]; 
       const adminDocRef = doc(db, 'admin', adminDoc.id);
 
-  
-      await updateDoc(adminDocRef, { password: newPassword });
+      // Set the password to "admin"
+      await updateDoc(adminDocRef, { password: "admin" });
 
-      return { success: true, message: 'Password reset successfully' };
+      return { success: true, message: 'Password reset to "admin" successfully' };
     }
     return { success: false, error: 'Admin not found' };
   } catch (error) {
