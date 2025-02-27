@@ -103,7 +103,7 @@ const FacultyList: React.FC = () => {
       <View style={styles.header}>
         <Text style={[styles.headerText, { flex: 1, textAlign: 'left' }]}>NAME</Text>
         <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>STATUS</Text>
-        <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>IN QUEUE</Text>
+        <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>WAITING</Text>
       </View>
       <FlatList
         data={filteredFacultyData}
