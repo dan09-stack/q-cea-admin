@@ -79,7 +79,6 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: "#4CAF50",
     borderRadius: 10,
   },
   queueCountContainer: {

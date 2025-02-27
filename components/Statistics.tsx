@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
-import { doc, onSnapshot, collection, query } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebaseConfig';
-import { LineChart } from 'react-native-chart-kit';
+import { LineChart, BarChart } from 'react-native-chart-kit';
 
 type PeriodType = 'hourly' | 'daily' | 'monthly' | 'yearly';
 
@@ -16,18 +16,36 @@ const Statistics: React.FC = () => {
       [date: string]: number
     }
   }>({});
+  const [facultyRatings, setFacultyRatings] = useState<{
+    [faculty: string]: {
+      consultationRating: number;
+      overallRating: number;
+      count: number;
+    }
+  }>({});
 
   useEffect(() => {
     const ratingsRef = collection(db, 'ratings');
     const ratingsUnsubscribe = onSnapshot(query(ratingsRef), (snapshot) => {
       const concerns: { [key: string]: number } = {};
       const dailyData: { [concern: string]: { [date: string]: number } } = {};
+      const facultyData: {
+        [faculty: string]: {
+          consultationRating: number;
+          overallRating: number;
+          count: number;
+        }
+      } = {};
       
       snapshot.forEach((doc) => {
         const data = doc.data();
         const concern = data.concern;
         const timestamp = data.timestamp?.toDate();
+        const faculty = data.faculty;
+        const overallRating = data.overallRating || 0;
+        const consultationRating = data.surveyAnswers?.consultationRating || 0;
         
+        // Aggregate concern data
         if (concern && timestamp) {
           concerns[concern] = (concerns[concern] || 0) + 1;
           
@@ -37,7 +55,30 @@ const Statistics: React.FC = () => {
           }
           dailyData[concern][dateStr] = (dailyData[concern][dateStr] || 0) + 1;
         }
+        
+        // Aggregate faculty rating data
+        if (faculty) {
+          if (!facultyData[faculty]) {
+            facultyData[faculty] = {
+              consultationRating: 0,
+              overallRating: 0,
+              count: 0
+            };
+          }
+          facultyData[faculty].consultationRating += consultationRating;
+          facultyData[faculty].overallRating += overallRating;
+          facultyData[faculty].count += 1;
+        }
       });
+      
+      // Calculate averages for faculty ratings
+      Object.keys(facultyData).forEach(faculty => {
+        if (facultyData[faculty].count > 0) {
+          facultyData[faculty].consultationRating /= facultyData[faculty].count;
+          facultyData[faculty].overallRating /= facultyData[faculty].count;
+        }
+      });
+      
       const ratings: { [key: string]: number } = {
         'User Experience': 0,
         'Navigation': 0,
@@ -52,14 +93,15 @@ const Statistics: React.FC = () => {
         const surveyAnswers = data.surveyAnswers;
         
         if (surveyAnswers) {
-          ratings['User Experience'] += surveyAnswers.userExperience || 0;
           ratings['Navigation'] += surveyAnswers.navigation || 0;
           ratings['Performance'] += surveyAnswers.performance || 0;
           ratings['Design'] += surveyAnswers.design || 0;
           ratings['Stability'] += surveyAnswers.stability || 0;
           ratings['Overall'] += data.overallRating || 0;
         }
-      });const docCount = snapshot.size || 1;
+      });
+      
+      const docCount = snapshot.size || 1;
       Object.keys(ratings).forEach(key => {
         ratings[key] = ratings[key] / docCount;
       });
@@ -67,6 +109,7 @@ const Statistics: React.FC = () => {
       setRatingStats(ratings);
       setConcernStats(concerns);
       setDailyConcernData(dailyData);
+      setFacultyRatings(facultyData);
     });
 
     const queueCounterRef = doc(db, 'admin', 'QueueCounter');
@@ -149,6 +192,8 @@ const Statistics: React.FC = () => {
                        date.getFullYear() === timestamp.getFullYear();
               case 'yearly':
                 return date.getFullYear() === timestamp.getFullYear();
+              default:
+                return false;
             }
           })
           .reduce((sum, [_, count]) => sum + count, 0)
@@ -167,13 +212,6 @@ const Statistics: React.FC = () => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Statistics Dashboard</Text>
       
-      <View style={styles.counterCard}>
-        <Text style={styles.counterTitle}>Today's Queue</Text>
-        <Text style={styles.counterValue}>{todayQueue}</Text>
-      </View>
-
-      
-
       <View style={styles.graphContainer}>
         <Text style={styles.graphTitle}>Concerns Distribution</Text>
         <View style={styles.graph}>
@@ -189,6 +227,43 @@ const Statistics: React.FC = () => {
           ))}
         </View>
       </View>
+      
+      {/* Faculty Consultation Ratings Section */}
+      <View style={styles.graphContainer}>
+        <Text style={styles.graphTitle}>Faculty Consultation Ratings</Text>
+        <View style={styles.graph}>
+          {Object.entries(facultyRatings).map(([faculty, data], index) => (
+            <View key={index} style={styles.barContainer}>
+              <View style={[styles.bar, { 
+                height: (data.consultationRating / 5) * 200, // Scale to 200px max height
+                backgroundColor: `hsl(${index * (360 / Object.keys(facultyRatings).length)}, 70%, 60%)`
+              }]} />
+              <Text style={styles.barLabel}>{faculty}</Text>
+              <Text style={styles.barValue}>{data.consultationRating.toFixed(1)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      
+      {/* Faculty Overall Ratings Section */}
+      <View style={styles.graphContainer}>
+        <Text style={styles.graphTitle}>Faculty Overall Ratings</Text>
+        <View style={styles.graph}>
+          {Object.entries(facultyRatings).map(([faculty, data], index) => (
+            <View key={index} style={styles.barContainer}>
+              <View style={[styles.bar, { 
+                height: (data.overallRating / 5) * 200, // Scale to 200px max height
+                backgroundColor: `hsl(${index * (360 / Object.keys(facultyRatings).length)}, 70%, 60%)`
+              }]} />
+              <Text style={styles.barLabel}>{faculty}</Text>
+              <Text style={styles.barValue}>{data.overallRating.toFixed(1)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      
+      
       <View style={styles.selectorContainer}>
         <TouchableOpacity 
           style={[styles.selectorButton, selectedPeriod === 'hourly' && styles.selectedButton]}
@@ -215,6 +290,7 @@ const Statistics: React.FC = () => {
           <Text style={[styles.selectorText, selectedPeriod === 'yearly' && styles.selectedText]}>Yearly</Text>
         </TouchableOpacity>
       </View>
+      
       {Object.keys(concernStats).map((concern, index) => (
         <View key={`line-${index}`} style={styles.lineChartContainer}>
           <Text style={styles.lineChartTitle}>{concern} - {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)} Trend</Text>
@@ -244,21 +320,21 @@ const Statistics: React.FC = () => {
         </View>
       ))}
 
-    <View style={styles.graphContainer}>
-      <Text style={styles.graphTitle}>Average Ratings Distribution</Text>
-      <View style={styles.graph}>
-        {Object.entries(ratingStats).map(([category, avgRating], index) => (
-          <View key={index} style={styles.barContainer}>
-            <View style={[styles.bar, { 
-              height: (avgRating / 5) * 200,  // Scale to 200px max height
-              backgroundColor: `hsl(${index * (360 / Object.keys(ratingStats).length)}, 70%, 60%)`
-            }]} />
-            <Text style={styles.barLabel}>{category}</Text>
-            <Text style={styles.barValue}>{avgRating.toFixed(1)}</Text>
-          </View>
-        ))}
+      <View style={styles.graphContainer}>
+        <Text style={styles.graphTitle}>Average Ratings Distribution</Text>
+        <View style={styles.graph}>
+          {Object.entries(ratingStats).map(([category, avgRating], index) => (
+            <View key={index} style={styles.barContainer}>
+              <View style={[styles.bar, { 
+                height: (avgRating / 5) * 200,  // Scale to 200px max height
+                backgroundColor: `hsl(${index * (360 / Object.keys(ratingStats).length)}, 70%, 60%)`
+              }]} />
+              <Text style={styles.barLabel}>{category}</Text>
+              <Text style={styles.barValue}>{avgRating.toFixed(1)}</Text>
+            </View>
+          ))}
+        </View>
       </View>
-    </View>
     </ScrollView>
   );
 };
@@ -272,8 +348,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-  },
-  selectorContainer: {
+  },  selectorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 20,
@@ -364,6 +439,51 @@ const styles = StyleSheet.create({
   lineChart: {
     marginVertical: 8,
     borderRadius: 16,
+  },
+  // Additional styles for faculty ratings
+  facultySection: {
+    marginBottom: 30,
+  },
+  facultyDetailContainer: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  facultyName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 4,
+  },
+  ratingLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  ratingValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  ratingBarBackground: {
+    height: 8,
+    width: '100%',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    marginVertical: 4,
+  },
+  ratingBarFill: {
+    height: 8,
+    borderRadius: 4,
   }
 });
 
