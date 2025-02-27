@@ -24,6 +24,7 @@ interface FacultyFormData {
   phoneNumber: string;
   email: string;
   password: string;
+  rfid_uid: string;
 }
 
 const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
@@ -35,6 +36,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     phoneNumber: "",
     email: "",
     password: "",
+    rfid_uid: "",
   });
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
@@ -45,17 +47,19 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
   };
 
   const programs = [
-    { label: "Select Program", value: "" },
-    { label: "Bachelor of Science in Civil Engineering", value: "BSCE" },
-    { label: "Bachelor of Science in Computer Engineering", value: "BSCpE" },
-    { label: "Bachelor of Science in Electrical Engineering", value: "BSEE" },
-    { label: "Bachelor of Science in Mechanical Engineering", value: "BSME" },
+    { label: "Select Program", value: "" }, 
+    { label: "B.S. Architecture", value: "ARCH" },
+    { label: "B.S. Civil Engineering", value: "CE" },
+    { label: "B.S. Computer Engineering", value: "CPE" },
+    { label: "B.S. Electrical Engineering", value: "EE" },
+    { label: "B.S. Electronics Engineering", value: "ECE" },
+    { label: "B.S. Mechanical Engineering", value: "ME" }
   ];
 
   const validateForm = () => {
     console.log("Validating form data:", formData); // Add this
     if (!formData.fullName || !formData.idNumber || !formData.program || 
-        !formData.phoneNumber || !formData.email || !formData.password) {
+        !formData.phoneNumber || !formData.email || !formData.password || !formData.rfid_uid) {
       console.log("Validation failed: Missing fields"); // Add this
       showAlert("Error", "Please fill in all fields");
       return false;
@@ -97,17 +101,20 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const user = userCredential.user;
 
-        await db.collection('faculty').doc(user.uid).set({
+        await db.collection('student').doc(user.uid).set({
           fullName: formData.fullName,
           idNumber: formData.idNumber,
           phoneNumber: formData.phoneNumber,
           program: formData.program,
           email: formData.email,
-          userType: 'faculty',
+          isVerified:true,
+          userType: 'FACULTY',
+          numOnQueue:0,
           status: 'OFFLINE',
+          rfid_uid: formData.rfid_uid,
           createdAt: new Date().toISOString()
         });
-        await sendEmailVerification(user);
+         await sendEmailVerification(user);
   
         showAlert("Success", "Faculty member added successfully");
         onClose();
@@ -141,7 +148,13 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         value={formData.idNumber}
         onChangeText={(text) => setFormData({...formData, idNumber: text})}
       />
-
+      <TextInput
+              style={styles.input}
+              placeholder="RFID UID"
+              placeholderTextColor="#000000"
+              value={formData.rfid_uid}
+              onChangeText={(text) => setFormData({...formData, rfid_uid: text})}
+            />
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={formData.program}
@@ -192,9 +205,8 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           onPress={() => {
             handleAdd();
           }}        >
-
-  <Text  style={styles.buttonText}>ADD</Text>
-</TouchableOpacity>
+          <Text  style={styles.buttonText}>ADD</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

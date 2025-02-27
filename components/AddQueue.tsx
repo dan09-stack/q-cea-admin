@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity, Platform } from "react-native";
+import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity, Platform, ScrollView } from "react-native";
 import { Picker } from '@react-native-picker/picker';
 import { auth, db } from '@/firebaseConfig';
 import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, onSnapshot, updateDoc, QueryConstraint,
   WhereFilterOp, 
   orderBy,
-  limit} from 'firebase/firestore';
+  
+  limit,
+  writeBatch} from 'firebase/firestore';
 import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 
@@ -221,7 +223,52 @@ useEffect(() => {
   
     return () => unsubscribe();
   }, [selectedStudent, currentDisplayedTicket, userTicketNumber]);
-
+  const handleCancelAllQueues = async () => {
+    try {
+      // Confirm cancellation first
+      if (!confirm('Are you sure you want to cancel ALL queues? This action cannot be undone.')) {
+        return;
+      }
+      
+      // Get all waiting students in queues
+      const studentsCollectionRef = collection(db, 'student');
+      const waitingStudentsQuery = firestoreQuery(
+        studentsCollectionRef, 
+        firestoreWhere('status', '==', 'waiting')
+      );
+      
+      const waitingStudentsSnapshot = await getDocs(waitingStudentsQuery);
+      
+      // Batch update to cancel all queues
+      if (!waitingStudentsSnapshot.empty) {
+        // Create batch using the writeBatch function
+        const batch = writeBatch(db);
+        
+        waitingStudentsSnapshot.docs.forEach((docSnapshot) => {
+          const studentRef = doc(db, 'student', docSnapshot.id);
+          batch.update(studentRef, {
+            status: 'completed',
+            userTicketNumber: null,
+            faculty: null,
+            concern: null,
+            otherConcern: null,
+            requestDate: null,
+            queuePosition: null
+          });
+        });
+        
+        await batch.commit();
+        Alert.alert('Success', `Cancelled ${waitingStudentsSnapshot.size} queues successfully`);
+      } else {
+        Alert.alert('Info', 'No active queues to cancel');
+      }
+    } catch (error) {
+      console.error('Error cancelling all queues:', error);
+      Alert.alert('Error', 'Failed to cancel all queues');
+    }
+  };
+  
+  
   const handleRequest = async () => {
     console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);
   
@@ -403,47 +450,85 @@ useEffect(() => {
 
   const TicketOverview = () => (
     <View style={styles.overviewContainer}>
-     <View style={styles.DualContainer}>
-      <Text style={styles.overviewTitle}>All Faculty Queues</Text>
-      <TouchableOpacity 
-        style={styles.closeButton}
-        onPress={() => setShowTicketOverview(false)}
-      >
-        <Text style={styles.buttonText}>Close</Text>
-      </TouchableOpacity>
-
-     </View>
-     <View style={styles.tableSubHeader}>
-          <Text style={[styles.headerCell, { flex: 1 }]}>Ticket #</Text>
-          <Text style={[styles.headerCell, { flex: 1 }]}>Student</Text>
-        </View>
-     {allFacultyTickets.map((facultyData, index) => (
-     
-     <View key={index} style={styles.tableSection}>
-        <View style={styles.tableHeader}>
-          <Text style={styles.headerCell}>{facultyData.faculty}</Text>
-        </View>
-
-        {facultyData.tickets.map((ticket, ticketIndex) => (
-          <TouchableOpacity
-            key={ticketIndex}
-            style={styles.tableRow}
-            onPress={() => {
-              setSelectedStudent(ticket.studentName);
-              setShowTicketOverview(false);
-            }}
-          >
-            <Text style={[styles.tableCell, { flex: 1 }]}>
-              {`${ticket.program}-${String(ticket.ticketNumber).padStart(4, '0')}`}
-            </Text>
-            <Text style={[styles.tableCell, { flex: 1 }]}>{ticket.studentName}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.DualContainer}>
+        <Text style={styles.overviewTitle}>All Faculty Queues</Text>
+        <TouchableOpacity 
+          style={styles.closeButton}
+          onPress={() => setShowTicketOverview(false)}
+        >
+          <Text style={styles.buttonText}>Close</Text>
+        </TouchableOpacity>
       </View>
-    ))}
       
+      <View style={styles.tableSubHeader}>
+        <Text style={[styles.headerCell, { flex: 1 }]}>Ticket #</Text>
+        <Text style={[styles.headerCell, { flex: 1 }]}>Student</Text>
+      </View>
+      
+      <ScrollView style={styles.scrollableContent}>
+        {allFacultyTickets.map((facultyData, index) => (
+          <View key={index} style={styles.tableSection}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.headerCell}>{facultyData.faculty}</Text>
+            </View>
+  
+            {facultyData.tickets.map((ticket, ticketIndex) => (
+              <View key={ticketIndex} style={[styles.tableRow, { justifyContent: 'space-between' }]}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', flex: 1 }}
+                  onPress={() => {
+                    setSelectedStudent(ticket.studentName);
+                    setShowTicketOverview(false);
+                  }}
+                >
+                  <Text style={[styles.tableCell, { flex: 1 }]}>
+                    {`${ticket.program}-${String(ticket.ticketNumber).padStart(4, '0')}`}
+                  </Text>
+                  <Text style={[styles.tableCell, { flex: 1 }]}>{ticket.studentName}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={async () => {
+                    try {
+                      // Find the student document by name
+                      const studentsQuery = firestoreQuery(
+                        collection(db, 'student'),
+                        firestoreWhere('fullName', '==', ticket.studentName),
+                        firestoreWhere('userTicketNumber', '==', ticket.ticketNumber)
+                      );
+                      
+                      const studentSnapshot = await getDocs(studentsQuery);
+                      if (!studentSnapshot.empty) {
+                        const studentDoc = studentSnapshot.docs[0];
+                        await updateDoc(doc(db, 'student', studentDoc.id), {
+                          status: 'cancelled',
+                          userTicketNumber: null,
+                          faculty: null,
+                          concern: null,
+                          otherConcern: null,
+                          requestDate: null,
+                          queuePosition: null
+                        });
+                        Alert.alert('Success', 'Queue cancelled successfully');
+                      } else {
+                        Alert.alert('Error', 'Could not find student');
+                      }
+                    } catch (error) {
+                      console.error('Error cancelling queue:', error);
+                      Alert.alert('Error', 'Failed to cancel the queue');
+                    }
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>X</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
+  
 
   return (
     <View style={styles.container}>
@@ -459,6 +544,12 @@ useEffect(() => {
             onPress={() => setShowTicketOverview(true)}
           >
             <Text style={styles.buttonText}>View All Tickets</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.cancelAllButton}
+            onPress={handleCancelAllQueues}
+          >
+            <Text style={styles.buttonText}>Cancel All Queues</Text>
           </TouchableOpacity>
          </View>
   
@@ -593,6 +684,37 @@ useEffect(() => {
 };
 
 const styles = StyleSheet.create({
+  scrollableContent: {
+    flex: 1,
+    width: '100%',
+    maxHeight: '75%', // You can adjust this value based on your needs
+  },
+  cancelAllButton: {
+    backgroundColor: '#D32F2F', // A deeper red
+    paddingVertical: 8,
+    borderRadius: 5,
+    width: '15%', 
+    alignItems: 'center',
+    marginLeft: 10, // Add spacing between buttons
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#FF5C5C',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: "#0d3310",

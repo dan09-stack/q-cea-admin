@@ -62,7 +62,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
       <TouchableOpacity onPress={onAddQueue}>
         <Text style={styles.button}>Add Queue</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={onVerifyFaculty}>
+      {/* <TouchableOpacity onPress={onVerifyFaculty}>
         <Text style={styles.button}>
           Verify Faculty Account{' '}
           {unverifiedCount > 0 && (
@@ -71,7 +71,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
             </Text>
           )}
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 };
