@@ -1,49 +1,48 @@
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../firebaseConfig';
+
+const ADMIN_EMAIL = "q.cea2024@gmail.com";
 
 /**
- * Verifies admin credentials by checking email and password in Firestore.
+ * Ensures the user is signed out when the app starts.
+ */
+export const checkAuthState = () => {
+  return new Promise((resolve) => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        signOut(auth); // Force logout on load
+      }
+      resolve(null);
+    });
+  });
+};
+
+/**
+ * Verifies admin credentials using Firebase Authentication.
  */
 export const verifyAdminCredentials = async (email: string, password: string) => {
   try {
-    const adminRef = collection(db, 'admin');
-    const q = query(
-      adminRef,
-      where('email', '==', email),
-      where('password', '==', password)
-    );
-
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      const adminData = querySnapshot.docs[0].data();
-      return { success: true, admin: adminData };
+    if (email !== ADMIN_EMAIL) {
+      return { success: false, error: "Unauthorized access" };
     }
-    return { success: false, error: 'Invalid credentials' };
+
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    return { success: true, admin: { email: user.email } };
   } catch (error) {
-    return { success: false, error: 'Authentication failed' };
+    return { success: false, error: "Invalid credentials" };
   }
 };
 
 /**
- * Resets the admin password to "admin" by updating it in Firestore.
+ * Sends a password reset email to the admin.
  */
 export const resetAdminPassword = async (email: string) => {
   try {
-    const adminRef = collection(db, 'admin');
-    const q = query(adminRef, where('email', '==', email));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      const adminDoc = querySnapshot.docs[0]; 
-      const adminDocRef = doc(db, 'admin', adminDoc.id);
-
-      // Set the password to "admin"
-      await updateDoc(adminDocRef, { password: "admin" });
-
-      return { success: true, message: 'Password reset to "admin" successfully' };
-    }
-    return { success: false, error: 'Admin not found' };
+    await sendPasswordResetEmail(auth, email);
+    return { success: true, message: 'Password reset email sent successfully' };
   } catch (error) {
-    return { success: false, error: 'Password reset failed' };
+    return { success: false, error: 'Failed to send reset email' };
   }
 };

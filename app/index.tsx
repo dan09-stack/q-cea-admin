@@ -1,28 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TextInput, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { verifyAdminCredentials, resetAdminPassword } from './services/adminAuth';
+import { auth } from './../firebaseConfig';
+import { signOut } from 'firebase/auth';
 
 const LoginScreen = () => {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+
+  // Ensure user is signed out on screen load
+  useEffect(() => {
+    const logout = async () => {
+      await signOut(auth); // Logs out any existing session
+    };
+    logout();
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       setErrorMessage('Please enter a valid email and password.');
       return;
     }
-  
+
     try {
       setLoading(true);
       setErrorMessage('');
-  
+
       const result = await verifyAdminCredentials(email, password);
-  
+
       if (result.success) {
         router.push('/(screens)/AdminDashboard');
       } else {
@@ -33,26 +44,20 @@ const LoginScreen = () => {
     } finally {
       setLoading(false);
     }
-  };  
-
+  };
 
   const handleForgotPassword = async () => {
     if (!email) {
       Alert.alert('Error', 'Please enter your email first.');
       return;
     }
-  
+
     try {
       setResetLoading(true);
-      
-      // Generate a random password
-      const newPassword = Math.random().toString(36).slice(-8);
-      
-      // Call reset function with email and new password
-      const result = await resetAdminPassword(email, newPassword);
-      
+      const result = await resetAdminPassword(email);
+
       if (result.success) {
-        Alert.alert('Password Reset', `Your new password is: ${newPassword}`);
+        Alert.alert('Password Reset', 'A password reset email has been sent. Please check your inbox.');
       } else {
         Alert.alert('Error', result.error || 'Password reset failed.');
       }
@@ -61,7 +66,7 @@ const LoginScreen = () => {
     } finally {
       setResetLoading(false);
     }
-  };  
+  };
 
   return (
     <View style={[styles.container, { pointerEvents: 'auto' }]}>
@@ -76,27 +81,28 @@ const LoginScreen = () => {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#ccc"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-        <TouchableOpacity 
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={[styles.input, { flex: 1 }]}
+            placeholder="Password"
+            placeholderTextColor="#ccc"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+            <Text style={{ color: '#fff', fontSize: 18 }}>{showPassword ? '🙈' : '👁️'}</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLogin}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>SIGN IN</Text>
-          )}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>SIGN IN</Text>}
         </TouchableOpacity>
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-        
+
         <TouchableOpacity onPress={handleForgotPassword} disabled={resetLoading}>
           <Text style={styles.forgotPassword}>
             {resetLoading ? 'Resetting password...' : 'Forgot your password?'}
@@ -133,6 +139,16 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     marginBottom: 15,
     color: '#fff',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  eyeIcon: {
+    padding: 10,
+    position: 'absolute',
+    right: 10,
   },
   button: {
     backgroundColor: '#43a047',

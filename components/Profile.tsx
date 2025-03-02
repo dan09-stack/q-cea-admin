@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator, Alert } from 'react-native';
+import { 
+  View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator, Alert 
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import firebase from '../firebaseConfig';
 import { collection, getDocs, doc, setDoc, query, limit } from 'firebase/firestore';
@@ -16,6 +18,11 @@ const Profile: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Email sending state
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   const firestore = firebase.firestore();
 
@@ -59,7 +66,45 @@ const Profile: React.FC = () => {
       setIsSaving(false);
     }
   };
-
+/*
+  const handleSendEmail = async () => {
+    if (!recipientEmail.trim() || !message.trim()) {
+      Alert.alert("Error", "Please enter both an email and a message.");
+      return;
+    }
+  
+    setIsSending(true);
+  
+    try {
+      const response = await fetch(
+        "https://us-central1-q-cea-3b4bf.cloudfunctions.net/sendEmail",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to: recipientEmail, // ✅ Matches Cloud Function parameters
+            message: message,
+          }),
+        }
+      );
+  
+      const responseText = await response.text();
+      
+      if (!response.ok) {
+        throw new Error(responseText);
+      }
+  
+      Alert.alert("Success", "Email sent successfully!");
+    } catch (error: any) {
+      console.error("Error sending email:", error);
+      Alert.alert("Error", error.message || "Failed to send email.");
+    } finally {
+      setIsSending(false);
+    }
+  };  
+*/
   const handleLogout = () => {
     router.replace('/');
   };
@@ -74,12 +119,10 @@ const Profile: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Logout Button */}
       <TouchableOpacity style={styles.backButton} onPress={handleLogout}>
         <Text style={styles.backButtonText}>← Logout</Text>
       </TouchableOpacity>
 
-      {/* Profile Card */}
       <View style={styles.card}>
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
@@ -106,7 +149,6 @@ const Profile: React.FC = () => {
           </View>
         </View>
 
-        {/* Edit & Save Buttons (Inside Profile Card) */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(!isEditing)}>
             <Text style={styles.editButtonText}>{isEditing ? 'Cancel' : 'Edit'}</Text>
@@ -117,12 +159,52 @@ const Profile: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Email Form */}
+        <View style={styles.emailContainer}>
+          <Text style={styles.infoText}>Send Email:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Recipient Email"
+            value={recipientEmail}
+            onChangeText={setRecipientEmail}
+          />
+          <TextInput
+            style={[styles.input, { height: 80 }]}
+            placeholder="Message"
+            value={message}
+            onChangeText={setMessage}
+            multiline
+          />
+          <TouchableOpacity 
+            style={styles.sendButton} 
+          /*  onPress={handleSendEmail} */
+            disabled={isSending}
+          >
+            <Text style={styles.sendButtonText}>{isSending ? 'Sending...' : 'Send Email'}</Text>
+          </TouchableOpacity>
+        </View> 
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  emailContainer: {
+    marginTop: 20,
+  },
+  sendButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   container: {
     flex: 1,
     backgroundColor: '#a5d653',
