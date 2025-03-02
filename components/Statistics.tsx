@@ -245,22 +245,25 @@ const Statistics: React.FC = () => {
         </View>
       </View>
       
-      {/* Faculty Overall Ratings Section */}
-      <View style={styles.graphContainer}>
-        <Text style={styles.graphTitle}>Faculty Overall Ratings</Text>
-        <View style={styles.graph}>
-          {Object.entries(facultyRatings).map(([faculty, data], index) => (
-            <View key={index} style={styles.barContainer}>
-              <View style={[styles.bar, { 
-                height: (data.overallRating / 5) * 200, // Scale to 200px max height
-                backgroundColor: `hsl(${index * (360 / Object.keys(facultyRatings).length)}, 70%, 60%)`
-              }]} />
-              <Text style={styles.barLabel}>{faculty}</Text>
-              <Text style={styles.barValue}>{data.overallRating.toFixed(1)}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+
+{/* Overall Ratings Section */}
+<View style={styles.graphContainer}>
+  <Text style={styles.graphTitle}>Overall Ratings</Text>
+  <View style={styles.graph}>
+    {/* Check if ratingStats and 'Overall' property exist */}
+    <View style={styles.barContainer}>
+      <View style={[styles.bar, { 
+        height: (ratingStats['Overall'] || 0) / 5 * 200, // Use || 0 to handle undefined
+        backgroundColor: `hsl(120, 70%, 60%)`
+      }]} />
+      <Text style={styles.barLabel}>Overall Rating</Text>
+      <Text style={styles.barValue}>
+        {ratingStats['Overall'] !== undefined ? ratingStats['Overall'].toFixed(1) : '0.0'}
+      </Text>
+    </View>
+  </View>
+</View>
+
 
       
       

@@ -331,10 +331,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a5620', // Darker green
   },
   saveButton: {
-    backgroundColor: '#0d47a1', // Dark blue
+    backgroundColor: 'rgb(10, 51, 10)', // Darker green
   },
   cancelButton: {
-    backgroundColor: '#b71c1c', // Dark red
+    backgroundColor: 'rgba(67, 28, 28, 0.48)', // Dark red
     marginTop: 10,
   },
   buttonText: {

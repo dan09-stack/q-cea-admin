@@ -7,11 +7,17 @@ import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, on
   orderBy,
   
   limit,
-  writeBatch} from 'firebase/firestore';
+  writeBatch,
+  query,
+  where,
+  increment} from 'firebase/firestore';
 import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 
 const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [showPriorityModal, setShowPriorityModal] = useState(false);
+const [priorityName, setPriorityName] = useState('');
+const [priorityId, setPriorityId] = useState('');
   const [selectedFaculty, setSelectedFaculty] = useState('');
   const [selectedConcern, setSelectedConcern] = useState('');
   const [otherConcern, setOtherConcern] = useState('');
@@ -239,11 +245,19 @@ useEffect(() => {
       
       const waitingStudentsSnapshot = await getDocs(waitingStudentsQuery);
       
-      // Batch update to cancel all queues
+      // Get all faculty users
+      const facultyQuery = firestoreQuery(
+        studentsCollectionRef,
+        firestoreWhere('userType', '==', 'FACULTY')
+      );
+      
+      const facultySnapshot = await getDocs(facultyQuery);
+      
+      // Batch update to cancel all queues and reset faculty queue counts
+      const batch = writeBatch(db);
+      
+      // Update all waiting students
       if (!waitingStudentsSnapshot.empty) {
-        // Create batch using the writeBatch function
-        const batch = writeBatch(db);
-        
         waitingStudentsSnapshot.docs.forEach((docSnapshot) => {
           const studentRef = doc(db, 'student', docSnapshot.id);
           batch.update(studentRef, {
@@ -256,17 +270,27 @@ useEffect(() => {
             queuePosition: null
           });
         });
-        
-        await batch.commit();
-        Alert.alert('Success', `Cancelled ${waitingStudentsSnapshot.size} queues successfully`);
-      } else {
-        Alert.alert('Info', 'No active queues to cancel');
       }
+      
+      // Update all faculty members to reset numOnQueue
+      if (!facultySnapshot.empty) {
+        facultySnapshot.docs.forEach((docSnapshot) => {
+          const facultyRef = doc(db, 'student', docSnapshot.id);
+          batch.update(facultyRef, {
+            numOnQueue: 0
+          });
+        });
+      }
+      
+      await batch.commit();
+      
+      Alert.alert('Success', `Cancelled ${waitingStudentsSnapshot.size} queues successfully and reset all faculty queue counts`);
     } catch (error) {
       console.error('Error cancelling all queues:', error);
       Alert.alert('Error', 'Failed to cancel all queues');
     }
   };
+  
   
   
   const handleRequest = async () => {
@@ -306,7 +330,7 @@ useEffect(() => {
         firestoreWhere('faculty', '==', selectedFaculty),
         firestoreWhere('status', '==', 'waiting')
       );
-      
+     
       const queueSnapshot = await getDocs(queueQuery);
       const queuePosition = queueSnapshot.size + 1;
   
@@ -332,6 +356,32 @@ useEffect(() => {
           queuePosition: queuePosition
         });
   
+        const facultyQuery = query(
+          collection(db, 'student'),
+          where('fullName', '==', selectedFaculty),
+          where('userType', '==', 'FACULTY')
+        );
+        
+        const facultySnapshot = await getDocs(facultyQuery);
+        if (!facultySnapshot.empty) {
+          const facultyDoc = facultySnapshot.docs[0];
+          const facultyData = facultyDoc.data();
+          
+          // If queue is empty, send notification to faculty
+          if (facultyData.numOnQueue === 0) {
+            // await sendNotificationToFaculty(facultyData.phoneNumber);
+            // await sendEmailNotification(
+            //   'template_jbfj8p6',
+            //   facultyData.email,
+            //   facultyData.fullName
+            // );
+          }
+          
+          await updateDoc(doc(db, 'student', facultyDoc.id), {
+            numOnQueue: increment(1)
+          });
+        }
+  
         setTicketNumber(newNumber);
         setIsRequested(true);
         Alert.alert('Success', `Queue position: ${queuePosition}`);
@@ -356,6 +406,20 @@ useEffect(() => {
         const studentData = studentDoc.data();
         console.log("Student data found:", studentData);
         
+        const facultyQuery = query(
+          collection(db, 'student'),
+          where('fullName', '==', selectedFaculty),
+          where('userType', '==', 'FACULTY')
+        );
+        
+        const facultySnapshot = await getDocs(facultyQuery);
+        if (!facultySnapshot.empty) {
+          const facultyDoc = facultySnapshot.docs[0];
+          
+          await updateDoc(doc(db, 'student', facultyDoc.id), {
+            numOnQueue: increment(-1)
+          });
+        }
         if (studentData.userType === 'STUDENT') {
           await updateDoc(studentRef, {
             status: 'cancelled',

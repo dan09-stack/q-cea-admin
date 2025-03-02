@@ -36,6 +36,7 @@ const Index = () => {
       source={require('../assets/images/green.jpg')}  
       style={styles.container}
     >
+      
       <View style={styles.loginBox}>
         <Text style={styles.title}>Admin Login</Text>
         <TextInput
