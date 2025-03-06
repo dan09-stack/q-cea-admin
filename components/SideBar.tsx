@@ -27,6 +27,9 @@ const Sidebar: React.FC<SidebarProps> = ({ navigation }) => {
       <TouchableOpacity onPress={() => navigation.navigate("List")} style={styles.icon}>
         <Icon name="list" size={40} color="#fff" />
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate("Settings")} style={styles.icon}>
+        <Icon name="settings" size={40} color="#fff" />
+      </TouchableOpacity>
       
       {/* Logout Icon at the bottom */}
       <View style={styles.spacer}></View>
@@ -44,11 +47,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start", // Align the icons to the top
     backgroundColor: "#032911", 
     padding: 10,
-    paddingTop: 100,
+    paddingTop: 50,
     alignItems: "center",
   },
   icon: {
-    marginBottom: 80,  // Space between icons
+    marginBottom: 30,  // Space between icons
   },
   spacer: {
     flexGrow: 1,  // Push the logout icon to the bottom

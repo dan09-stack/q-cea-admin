@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDoc, setDoc, increment } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 interface AddQueueVisitorProps {
@@ -79,53 +79,87 @@ useEffect(() => {
       showAlert("Please enter your name");
       return;
     }
-
+  
     if (!selectedFaculty) {
       showAlert("Please select a faculty member");
       return;
     }
-
+  
     if (!selectedConcern) {
       showAlert("Please select a concern");
       return;
     }
-
+  
     const concern = selectedConcern === "Other" ? otherConcern : selectedConcern;
     if (selectedConcern === "Other" && !otherConcern.trim()) {
       showAlert("Please specify your concern");
       return;
     }
-
+  
+    // Check if selected faculty is online
+    const selectedFacultyData = facultyList.find(faculty => faculty.id === selectedFaculty);
+    if (selectedFacultyData?.status !== 'ONLINE') {
+      showAlert("The faculty is currently unavailable. Your request has been cancelled.");
+      return;
+    }
+  
     setIsLoading(true);
     try {
-      // Generate ticket number (format: V-001)
-      const timestamp = new Date().getTime();
-      const ticketNum = `V-${timestamp.toString().slice(-4)}`;
-      setTicketNumber(ticketNum);
-
-      // Get selected faculty information
-      const selectedFacultyData = facultyList.find(faculty => faculty.id === selectedFaculty);
+      // Get ticket number from ticketNumberCounter collection
+      const ticketRef = doc(db, 'ticketNumberCounter', 'ticket');
+      const ticketSnap = await getDoc(ticketRef);
       
+      let newTicketNum;
+      
+      if (ticketSnap.exists()) {
+        const currentNumber = ticketSnap.data().ticketNum;
+        const newNumber = currentNumber + 1;
+        
+        // Update the ticket counter
+        await updateDoc(ticketRef, {
+          ticketNum: newNumber
+        });
+        
+        newTicketNum = `${newNumber}`;
+      } else {
+        // If document doesn't exist, create it with initial value
+        const initialNumber = 1;
+        await setDoc(ticketRef, { ticketNum: initialNumber });
+        newTicketNum = `${initialNumber}`;
+      }
+      
+      setTicketNumber(newTicketNum);
+  
       // Add to queue collection
       await addDoc(collection(db, "student"), {
-        visitorName: visitorName,
+        fullName: visitorName,
         faculty: selectedFaculty,
         facultyName: selectedFacultyData?.fullName,
         concern: concern,
         timestamp: serverTimestamp(),
         status: "waiting",
-        ticketNumber: ticketNum,
-        program:"VST",
+        userTicketNumber: newTicketNum,
+        program: "VST",
+        userType: "STUDENT",
         type: "visitor"
       });
-
-      // Increment numOnQueue for faculty
+  
+      // Increment numOnQueue for faculty and possibly send notification
       const facultyRef = doc(db, "student", selectedFaculty);
+      const facultyData = (await getDoc(facultyRef)).data();
+      
+      // If this is the first person in queue, consider sending notification like in the reference code
+      if (facultyData && facultyData.numOnQueue === 0) {
+        // If you have notification functions, you could call them here
+        // sendNotificationToFaculty(facultyData.phoneNumber);
+        // sendEmailNotification('template_jbfj8p6', facultyData.email, facultyData.fullName);
+      }
+      
       await updateDoc(facultyRef, {
-        numOnQueue: (facultyList.find(f => f.id === selectedFaculty)?.numOnQueue || 0) + 1
+        numOnQueue: increment(1)
       });
-
-      showAlert(`Queue added successfully! Your ticket number is ${ticketNum}`);
+  
+      showAlert(`Queue added successfully! Your ticket number is ${newTicketNum}`);
       onClose();
     } catch (error) {
       console.error("Error adding queue:", error);
@@ -134,6 +168,7 @@ useEffect(() => {
       setIsLoading(false);
     }
   };
+  
 
   return (
     <ScrollView style={styles.container}>

@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AddAdminScreen from "@/components/VerifyFaculty";
 import AddQueueVisitor from "@/components/AddQueueVisitor";
 import List from "@/components/List";
-
+import Settings from "@/components/Settings";
 const AdminDashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState('faculty'); // Default view is 'faculty'
   const [showAddAdmin, setShowAddAdmin] = useState(false);
@@ -32,6 +32,8 @@ const AdminDashboard: React.FC = () => {
                 setCurrentView('statistics');
               } else if (screen === 'List') {
                 setCurrentView('list');
+              } else if (screen === 'Settings') {
+                setCurrentView('settings');
               }
             },
           }}
@@ -105,6 +107,8 @@ const AdminDashboard: React.FC = () => {
           <Profile />
         ) : currentView === 'list' ? (
           <List />
+        ) : currentView === 'settings' ? (
+          <Settings />
         ) : currentView === 'statistics' ? (
           <Statistics />
         ) : (
