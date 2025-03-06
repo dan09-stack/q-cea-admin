@@ -229,12 +229,78 @@ useEffect(() => {
   
     return () => unsubscribe();
   }, [selectedStudent, currentDisplayedTicket, userTicketNumber]);
+  // Add this function to check if current time is after hours
+  const isAfterHours = (): boolean => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    // After hours is between 6:00 PM (18) and 5:00 AM (5)
+    return currentHour >= 18 || currentHour < 5;
+  };
+  
+  // Add this function to automatically cancel queues during after hours
+  const checkAndCancelAfterHoursQueues = async () => {
+    if (isAfterHours()) {
+      console.log("After hours detected - cancelling all queues");
+      try {
+        const studentsCollectionRef = collection(db, 'student');
+        const waitingStudentsQuery = firestoreQuery(
+          studentsCollectionRef, 
+          firestoreWhere('status', '==', 'waiting')
+        );
+        
+        // Get faculty status for reference
+        const facultyQuery = firestoreQuery(
+          studentsCollectionRef,
+          firestoreWhere('userType', '==', 'FACULTY')
+        );
+        
+        const facultySnapshot = await getDocs(facultyQuery);
+        const batch = writeBatch(db);
+        
+        if (!facultySnapshot.empty) {
+          facultySnapshot.docs.forEach((docSnapshot: DocumentSnapshot) => {
+            const facultyRef = doc(db, 'student', docSnapshot.id);
+            batch.update(facultyRef, {
+              status: 'OFFLINE'
+            });
+          });
+        }
+        
+        // If there are no waiting students, no need to proceed
+        const waitingStudentsSnapshot = await getDocs(waitingStudentsQuery);
+        if (waitingStudentsSnapshot.empty) {
+          console.log("No active queues to cancel");
+          await batch.commit();
+          return;
+        }
+        
+        await handleCancelAllQueues();
+        console.log("Successfully cancelled all queues due to after hours");
+      } catch (error) {
+        console.error('Error in automatic queue cancellation:', error);
+      }
+    }
+  };
+  
+  // Add this useEffect to check time periodically
+  useEffect(() => {
+    // Check immediately when component mounts
+    checkAndCancelAfterHoursQueues();
+    
+    // Set up interval to check every minute
+    const intervalId = setInterval(checkAndCancelAfterHoursQueues, 60000);
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []);
+
+
   const handleCancelAllQueues = async () => {
     try {
       // Confirm cancellation first
-      if (!confirm('Are you sure you want to cancel ALL queues? This action cannot be undone.')) {
-        return;
-      }
+      // if (!confirm('Are you sure you want to cancel ALL queues? This action cannot be undone.')) {
+      //   return;
+      // }
       
       // Get all waiting students in queues
       const studentsCollectionRef = collection(db, 'student');
@@ -563,7 +629,20 @@ useEffect(() => {
                         firestoreWhere('fullName', '==', ticket.studentName),
                         firestoreWhere('userTicketNumber', '==', ticket.ticketNumber)
                       );
+                      const facultyQuery = query(
+                        collection(db, 'student'),
+                        where('fullName', '==', selectedFaculty),
+                        where('userType', '==', 'FACULTY')
+                      );
                       
+                      const facultySnapshot = await getDocs(facultyQuery);
+                      if (!facultySnapshot.empty) {
+                        const facultyDoc = facultySnapshot.docs[0];
+                        
+                        await updateDoc(doc(db, 'student', facultyDoc.id), {
+                          numOnQueue: increment(-1)
+                        });
+                      }
                       const studentSnapshot = await getDocs(studentsQuery);
                       if (!studentSnapshot.empty) {
                         const studentDoc = studentSnapshot.docs[0];

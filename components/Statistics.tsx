@@ -80,7 +80,6 @@ const Statistics: React.FC = () => {
       });
       
       const ratings: { [key: string]: number } = {
-        'User Experience': 0,
         'Navigation': 0,
         'Performance': 0,
         'Design': 0,
@@ -229,7 +228,7 @@ const Statistics: React.FC = () => {
       </View>
       
       {/* Faculty Consultation Ratings Section */}
-      <View style={styles.graphContainer}>
+      {/* <View style={styles.graphContainer}>
         <Text style={styles.graphTitle}>Faculty Consultation Ratings</Text>
         <View style={styles.graph}>
           {Object.entries(facultyRatings).map(([faculty, data], index) => (
@@ -243,26 +242,10 @@ const Statistics: React.FC = () => {
             </View>
           ))}
         </View>
-      </View>
+      </View> */}
       
 
-{/* Overall Ratings Section */}
-<View style={styles.graphContainer}>
-  <Text style={styles.graphTitle}>Overall Ratings</Text>
-  <View style={styles.graph}>
-    {/* Check if ratingStats and 'Overall' property exist */}
-    <View style={styles.barContainer}>
-      <View style={[styles.bar, { 
-        height: (ratingStats['Overall'] || 0) / 5 * 200, // Use || 0 to handle undefined
-        backgroundColor: `hsl(120, 70%, 60%)`
-      }]} />
-      <Text style={styles.barLabel}>Overall Rating</Text>
-      <Text style={styles.barValue}>
-        {ratingStats['Overall'] !== undefined ? ratingStats['Overall'].toFixed(1) : '0.0'}
-      </Text>
-    </View>
-  </View>
-</View>
+
 
 
       
@@ -323,7 +306,7 @@ const Statistics: React.FC = () => {
         </View>
       ))}
 
-      <View style={styles.graphContainer}>
+      {/* <View style={styles.graphContainer}>
         <Text style={styles.graphTitle}>Average Ratings Distribution</Text>
         <View style={styles.graph}>
           {Object.entries(ratingStats).map(([category, avgRating], index) => (
@@ -337,7 +320,7 @@ const Statistics: React.FC = () => {
             </View>
           ))}
         </View>
-      </View>
+      </View> */}
     </ScrollView>
   );
 };

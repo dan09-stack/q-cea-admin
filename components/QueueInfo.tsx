@@ -54,13 +54,13 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
 
       {/* Action Buttons */}
       <TouchableOpacity onPress={onAddFaculty}>
-        <Text style={styles.button}>Add Faculty</Text>
+        <Text style={styles.button}>Register Faculty</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onAddStudent}>
-        <Text style={styles.button}>Add Student</Text>
+        <Text style={styles.button}>Register Student</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onAddQueue}>
-        <Text style={styles.button}>Add Queue</Text>
+        <Text style={styles.button}>Queue</Text>
       </TouchableOpacity>
       {/* <TouchableOpacity onPress={onVerifyFaculty}>
         <Text style={styles.button}>
