@@ -24,6 +24,9 @@ const Sidebar: React.FC<SidebarProps> = ({ navigation }) => {
       <TouchableOpacity onPress={() => navigation.navigate("Profile")} style={styles.icon}>
         <Icon name="person-outline" size={40} color="#fff" />
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate("List")} style={styles.icon}>
+        <Icon name="list" size={40} color="#fff" />
+      </TouchableOpacity>
       
       {/* Logout Icon at the bottom */}
       <View style={styles.spacer}></View>

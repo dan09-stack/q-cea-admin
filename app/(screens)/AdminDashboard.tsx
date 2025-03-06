@@ -12,6 +12,7 @@ import { View, StyleSheet } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import AddAdminScreen from "@/components/VerifyFaculty";
 import AddQueueVisitor from "@/components/AddQueueVisitor";
+import List from "@/components/List";
 
 const AdminDashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState('faculty'); // Default view is 'faculty'
@@ -29,6 +30,8 @@ const AdminDashboard: React.FC = () => {
                 setCurrentView('faculty');
               } else if (screen === 'Dashboard') {
                 setCurrentView('statistics');
+              } else if (screen === 'List') {
+                setCurrentView('list');
               }
             },
           }}
@@ -100,6 +103,8 @@ const AdminDashboard: React.FC = () => {
           </View>
         ) : currentView === 'profile' ? (
           <Profile />
+        ) : currentView === 'list' ? (
+          <List />
         ) : currentView === 'statistics' ? (
           <Statistics />
         ) : (
