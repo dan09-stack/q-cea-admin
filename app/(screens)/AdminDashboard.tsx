@@ -11,6 +11,7 @@ import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import AddAdminScreen from "@/components/VerifyFaculty";
+import AddQueueVisitor from "@/components/AddQueueVisitor";
 
 const AdminDashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState('faculty'); // Default view is 'faculty'
@@ -41,6 +42,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.facultyContainer}>
             <AddFaculty onClose={() => setCurrentView('faculty')} />
             <QueueInfo
+              onAddQueueVisitor={() => setCurrentView('addQueueVisitor')}
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
@@ -52,6 +54,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.facultyContainer}>
             <AddStudent onClose={() => setCurrentView('faculty')} />
             <QueueInfo
+              onAddQueueVisitor={() => setCurrentView('addQueueVisitor')}
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
@@ -63,6 +66,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.facultyContainer}>
             <AddAdmin onClose={() => setCurrentView('faculty')} />
             <QueueInfo
+              onAddQueueVisitor={() => setCurrentView('addQueueVisitor')}
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
@@ -73,7 +77,20 @@ const AdminDashboard: React.FC = () => {
         ) : currentView === 'addQueue' ? (
           <View style={styles.facultyContainer}>
             <AddQueue onClose={() => setCurrentView('faculty')} />
-            <QueueInfo
+            <QueueInfo  
+              onAddQueueVisitor={() => setCurrentView('addQueueVisitor')}
+              onAddFaculty={() => setCurrentView('addFaculty')}
+              onAddStudent={() => setCurrentView('addStudent')}
+              onAddQueue={() => setCurrentView('addQueue')}
+              onViewRatings={() => alert('Faculty Ratings')}
+              onVerifyFaculty={() => setCurrentView('verifyFaculty')}
+            />
+          </View>
+        ) : currentView === 'addQueueVisitor' ? (
+          <View style={styles.facultyContainer}>
+            <AddQueueVisitor onClose={() => setCurrentView('faculty')} />
+            <QueueInfo  
+              onAddQueueVisitor={() => setCurrentView('addQueueVisitor')}
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onAddQueue={() => setCurrentView('addQueue')}
@@ -89,6 +106,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.facultyContainer}>
             <FacultyList />
             <QueueInfo
+              onAddQueueVisitor={() => setCurrentView('addQueueVisitor')}
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}

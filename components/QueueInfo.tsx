@@ -8,8 +8,8 @@ interface QueueInfoProps {
   onAddStudent: () => void;
   onVerifyFaculty: () => void;
   onAddQueue: () => void;
+  onAddQueueVisitor: () => void;
   onViewRatings: () => void;
-  
 }
 
 const QueueInfo: React.FC<QueueInfoProps> = ({
@@ -17,8 +17,8 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
   onAddStudent,
   onVerifyFaculty,
   onAddQueue,
+  onAddQueueVisitor,
   onViewRatings,
-  
 }) => {
   const [queueCount, setQueueCount] = useState<number>(0); // State to store queue count
   const [unverifiedCount, setUnverifiedCount] = useState<number>(0);
@@ -67,6 +67,9 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
       </TouchableOpacity>
       <TouchableOpacity onPress={onAddQueue}>
         <Text style={styles.button}>Queue</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onAddQueueVisitor}>
+        <Text style={styles.button}>Queue Visitor</Text>
       </TouchableOpacity>
       {/* <TouchableOpacity onPress={onVerifyFaculty}>
         <Text style={styles.button}>
