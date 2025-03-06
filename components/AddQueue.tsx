@@ -329,6 +329,7 @@ useEffect(() => {
           batch.update(studentRef, {
             status: 'completed',
             userTicketNumber: null,
+            
             faculty: null,
             concern: null,
             otherConcern: null,
@@ -343,8 +344,9 @@ useEffect(() => {
         facultySnapshot.docs.forEach((docSnapshot) => {
           const facultyRef = doc(db, 'student', docSnapshot.id);
           batch.update(facultyRef, {
-            numOnQueue: 0
-          });
+            numOnQueue: 0,
+            displayedTicket:null
+       });
         });
       }
       
