@@ -246,9 +246,6 @@ const Statistics: React.FC = () => {
       
 
 
-
-
-      
       
       <View style={styles.selectorContainer}>
         <TouchableOpacity 

@@ -31,18 +31,24 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
     const unsubscribeUnverified = onSnapshot(unverifiedQuery, (snapshot) => {
       setUnverifiedCount(snapshot.size);
     });
-    // Real-time fetch queueCount from Firestore where status is "waiting"
-    const unsubscribe = studentRef
-      .where("status", "==", "waiting")
-      .onSnapshot((querySnapshot) => {
-        // Update the queueCount whenever the collection changes
-        setQueueCount(querySnapshot.size); // 'size' gives the number of matching documents
+  
+    // Query all faculty members and sum their numOnQueue
+    const facultyQuery = query(facultyRef, where("userType", "==", "FACULTY"));
+    const unsubscribeFaculty = onSnapshot(facultyQuery, (snapshot) => {
+      let totalOnQueue = 0;
+      snapshot.forEach((doc) => {
+        totalOnQueue += doc.data().numOnQueue || 0;
       });
-
-    // Cleanup the listener when the component unmounts
-    return () => unsubscribe();
-  }, []); // Empty dependency array means this effect runs only once when the component mounts
-
+      setQueueCount(totalOnQueue);
+    });
+  
+    // Cleanup the listeners when the component unmounts
+    return () => {
+      unsubscribeUnverified();
+      unsubscribeFaculty();
+    };
+  }, []);
+  
   return (
     <View style={styles.container}>
       {/* Queue Count Section */}
