@@ -27,7 +27,6 @@ const Settings: React.FC = () => {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   
-  // For non-web platforms, we need Date objects for the pickers
   const [startTimeDate, setStartTimeDate] = useState(new Date());
   const [endTimeDate, setEndTimeDate] = useState(new Date());
 
@@ -36,12 +35,11 @@ const Settings: React.FC = () => {
       checkAndCancelAfterHoursQueues();
     }, 1000); 
     
-    return () => clearInterval(intervalId); // Clean up on unmount
-  }, []);
+    return () => clearInterval(intervalId);
+  }, [businessHours]);
   useEffect(() => {
     loadSettings();
     
-    // Set the date objects for time pickers
     const startDate = new Date();
     startDate.setHours(businessHours.startHour);
     startDate.setMinutes(businessHours.startMinute);

@@ -283,16 +283,16 @@ useEffect(() => {
   };
   
   // Add this useEffect to check time periodically
-  useEffect(() => {
-    // Check immediately when component mounts
-    checkAndCancelAfterHoursQueues();
+  // useEffect(() => {
+  //   // Check immediately when component mounts
+  //   checkAndCancelAfterHoursQueues();
     
-    // Set up interval to check every minute
-    const intervalId = setInterval(checkAndCancelAfterHoursQueues, 60000);
+  //   // Set up interval to check every minute
+  //   const intervalId = setInterval(checkAndCancelAfterHoursQueues, 60000);
     
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
-  }, []);
+  //   // Clean up interval on component unmount
+  //   return () => clearInterval(intervalId);
+  // }, []);
 
 
   const handleCancelAllQueues = async () => {

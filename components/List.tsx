@@ -27,6 +27,7 @@ interface UserItem {
   numOnQueue: number;
   phoneNumber: string;
   idNumber: string;
+  userTicketNumber: string;
 }
 
 const List: React.FC = () => {
@@ -83,6 +84,7 @@ const List: React.FC = () => {
           numOnQueue: data.numOnQueue || 0,
           phoneNumber: data.phoneNumber || '',
           idNumber: data.idNumber || '',
+          userTicketNumber: data.userTicketNumber || '',
         });
       });
       
@@ -158,7 +160,8 @@ const List: React.FC = () => {
         status: formData.status,
         numOnQueue: formData.numOnQueue || 0,
         phoneNumber: formData.phoneNumber,
-        idNumber: formData.idNumber
+        idNumber: formData.idNumber,
+        userTicketNumber: formData.userTicketNumber
       });
       
       showAlert('Success', 'User updated successfully!');
@@ -188,7 +191,8 @@ const List: React.FC = () => {
         phoneNumber: formData.phoneNumber || '',
         idNumber: formData.idNumber || '',
         isVerified: true,
-        createdAt: new Date()
+        createdAt: new Date(),
+        userTicketNumber: formData.userTicketNumber || ''
       });
       
       showAlert('Success', 'User created successfully!');
@@ -227,6 +231,8 @@ const List: React.FC = () => {
         <Text style={styles.userDetail}>ID: {item.idNumber}</Text>
         <Text style={styles.userDetail}>Type: {item.userType}</Text>
         <Text style={styles.userDetail}>Program: {item.program}</Text>
+        <Text style={styles.userDetail}>
+          Ticket Number: {item.userTicketNumber || 'No active ticket'}</Text>
         <Text style={styles.userDetail}>Status: 
           <Text style={item.status === 'ONLINE' ? styles.statusOnline : styles.statusOffline}>
             {item.status}

@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDoc, setDoc, increment } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDoc, setDoc, increment, getDocs } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 interface AddQueueVisitorProps {
@@ -20,7 +20,8 @@ interface AddQueueVisitorProps {
 
 const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
   const [visitorName, setVisitorName] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("");
+  const [selectedFacultyId, setSelectedFacultyId] = useState("");
+  const [selectedFacultyName, setSelectedFacultyName] = useState("");
   const [selectedConcern, setSelectedConcern] = useState("");
   const [otherConcern, setOtherConcern] = useState("");
   const [facultyList, setFacultyList] = useState<Array<{id: string, fullName: string, status: string, numOnQueue?: number}>>([]);
@@ -37,27 +38,25 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
   };
 
   // Fetch faculty list
-  // Fetch faculty list
-useEffect(() => {
-  const facultyRef = collection(db, "student");
-  const q = query(facultyRef, where("userType", "==", "FACULTY"), where("status", "==", "ONLINE"));
-  
-  const unsubscribe = onSnapshot(q, (querySnapshot) => {
-    const faculty: Array<{id: string, fullName: string, status: string, numOnQueue?: number}> = [];
-    querySnapshot.forEach((doc) => {
-      faculty.push({
-        id: doc.id,
-        fullName: doc.data().fullName || "",
-        status: doc.data().status || "OFFLINE",
-        numOnQueue: doc.data().numOnQueue || 0,
+  useEffect(() => {
+    const facultyRef = collection(db, "student");
+    const q = query(facultyRef, where("userType", "==", "FACULTY"), where("status", "==", "ONLINE"));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const faculty: Array<{id: string, fullName: string, status: string, numOnQueue?: number}> = [];
+      querySnapshot.forEach((doc) => {
+        faculty.push({
+          id: doc.id,
+          fullName: doc.data().fullName || "",
+          status: doc.data().status || "OFFLINE",
+          numOnQueue: doc.data().numOnQueue || 0,
+        });
       });
+      setFacultyList(faculty);
     });
-    setFacultyList(faculty);
-  });
 
-  return () => unsubscribe();
-}, []);
-
+    return () => unsubscribe();
+  }, []);
 
   // Fetch concerns list
   useEffect(() => {
@@ -79,96 +78,94 @@ useEffect(() => {
       showAlert("Please enter your name");
       return;
     }
-  
-    if (!selectedFaculty) {
+    
+    if (!selectedFacultyId) {
       showAlert("Please select a faculty member");
       return;
     }
-  
-    if (!selectedConcern) {
-      showAlert("Please select a concern");
-      return;
-    }
-  
-    const concern = selectedConcern === "Other" ? otherConcern : selectedConcern;
-    if (selectedConcern === "Other" && !otherConcern.trim()) {
-      showAlert("Please specify your concern");
-      return;
-    }
-  
-    // Check if selected faculty is online
-    const selectedFacultyData = facultyList.find(faculty => faculty.id === selectedFaculty);
-    if (selectedFacultyData?.status !== 'ONLINE') {
-      showAlert("The faculty is currently unavailable. Your request has been cancelled.");
+    
+    if (!selectedConcern && !otherConcern) {
+      showAlert("Please select or specify your concern");
       return;
     }
   
     setIsLoading(true);
     try {
-      // Get ticket number from ticketNumberCounter collection
+      // Get queue position for waiting visitors for this faculty
+      const queueQuery = query(
+        collection(db, 'student'),
+        where('faculty', '==', selectedFacultyName),
+        where('status', '==', 'waiting')
+      );
+      
+      const queueSnapshot = await getDocs(queueQuery);
+      const queuePosition = queueSnapshot.size + 1;
+  
+      // Get next ticket number
       const ticketRef = doc(db, 'ticketNumberCounter', 'ticket');
       const ticketSnap = await getDoc(ticketRef);
-      
-      let newTicketNum;
-      
+  
       if (ticketSnap.exists()) {
-        const currentNumber = ticketSnap.data().ticketNum;
+        const currentNumber = ticketSnap.data().ticketNum || 0;
         const newNumber = currentNumber + 1;
-        
-        // Update the ticket counter
+  
+        // Update the ticket counter with the same field name as read
         await updateDoc(ticketRef, {
           ticketNum: newNumber
         });
-        
-        newTicketNum = `${newNumber}`;
+  
+        // Create a new visitor queue entry
+        await addDoc(collection(db, 'student'), {
+          fullName: visitorName,
+          faculty: selectedFacultyName, // Use the faculty name here
+          concern: selectedConcern === "Other" ? otherConcern : selectedConcern,
+          otherConcern: selectedConcern === "Other" ? otherConcern : "",
+          requestDate: new Date(),
+          status: 'waiting',
+          queuePosition: queuePosition,
+          userTicketNumber: newNumber,
+          program: "VST",
+          userType: "STUDENT",
+        });
+  
+        // Update faculty's queue count directly by ID
+        await updateDoc(doc(db, 'student', selectedFacultyId), {
+          numOnQueue: increment(1)
+        });
+  
+        setTicketNumber(newNumber.toString());
+        showAlert(`Queue ticket created successfully. Your ticket number is ${newNumber} and your position in queue is ${queuePosition}.`);
+        onClose(); // Close the form after successful submission
       } else {
-        // If document doesn't exist, create it with initial value
-        const initialNumber = 1;
-        await setDoc(ticketRef, { ticketNum: initialNumber });
-        newTicketNum = `${initialNumber}`;
+        // If the ticket counter document doesn't exist, create it
+        await setDoc(doc(db, 'ticketNumberCounter', 'ticket'), {
+          ticketNum: 1
+        });
+        
+        
+        
+        // Update faculty's queue count
+        await updateDoc(doc(db, 'student', selectedFacultyId), {
+          numOnQueue: increment(1)
+        });
+        
+        setTicketNumber("1");
+        showAlert(`Queue ticket created successfully. Your ticket number is 1 and your position in queue is ${queuePosition}.`);
+        onClose();
       }
-      
-      setTicketNumber(newTicketNum);
-  
-      // Add to queue collection
-      await addDoc(collection(db, "student"), {
-        fullName: visitorName,
-        faculty: selectedFaculty,
-        facultyName: selectedFacultyData?.fullName,
-        concern: concern,
-        timestamp: serverTimestamp(),
-        status: "waiting",
-        userTicketNumber: newTicketNum,
-        program: "VST",
-        userType: "STUDENT",
-        type: "visitor"
-      });
-  
-      // Increment numOnQueue for faculty and possibly send notification
-      const facultyRef = doc(db, "student", selectedFaculty);
-      const facultyData = (await getDoc(facultyRef)).data();
-      
-      // If this is the first person in queue, consider sending notification like in the reference code
-      if (facultyData && facultyData.numOnQueue === 0) {
-        // If you have notification functions, you could call them here
-        // sendNotificationToFaculty(facultyData.phoneNumber);
-        // sendEmailNotification('template_jbfj8p6', facultyData.email, facultyData.fullName);
-      }
-      
-      await updateDoc(facultyRef, {
-        numOnQueue: increment(1)
-      });
-  
-      showAlert(`Queue added successfully! Your ticket number is ${newTicketNum}`);
-      onClose();
     } catch (error) {
-      console.error("Error adding queue:", error);
-      showAlert("Failed to add to queue. Please try again.");
+      console.error('Error adding to queue:', error);
+      showAlert('Failed to join queue. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
   
+  const handleFacultyChange = (itemValue: string) => {
+    setSelectedFacultyId(itemValue);
+    const faculty = facultyList.find(f => f.id === itemValue);
+    setSelectedFacultyName(faculty ? faculty.fullName : "");
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -191,15 +188,15 @@ useEffect(() => {
         <Text style={styles.label}>Select Faculty</Text>
         <View style={styles.pickerContainer}>
           <Picker
-            selectedValue={selectedFaculty}
-            onValueChange={(itemValue) => setSelectedFaculty(itemValue)}
+            selectedValue={selectedFacultyId}
+            onValueChange={handleFacultyChange}
             style={styles.picker}
           >
             <Picker.Item label="Select Faculty" value="" />
             {facultyList.map((faculty) => (
               <Picker.Item
                 key={faculty.id}
-                label={faculty.fullName}
+                label={`${faculty.fullName} (Queue: ${faculty.numOnQueue})`}
                 value={faculty.id}
               />
             ))}
