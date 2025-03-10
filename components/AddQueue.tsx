@@ -47,7 +47,7 @@ const [priorityId, setPriorityId] = useState('');
       status: string
     }>
   }>>([]);
-
+  const [specificDetails, setSpecificDetails] = useState("");
 const showAlert = (message: string) => {
   if (Platform.OS === 'web') {
     window.alert(message);
@@ -827,7 +827,31 @@ useEffect(() => {
                     )}
                   </Picker>
                 </View>
-                
+
+                {/* Add this conditional rendering for Other Concern */}
+                {selectedConcern === "Other" && (
+                  <>
+                    <Text style={styles.formLabel}>Specify Other Concern</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Please specify your concern"
+                      placeholderTextColor="#aaa"
+                      value={otherConcern}
+                      onChangeText={setOtherConcern}
+                    />
+                  </>
+                )}
+
+                <Text style={styles.formLabel}>Specific Details</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter specific details about the concern"
+                  placeholderTextColor="#aaa"
+                  value={specificDetails}
+                  onChangeText={setSpecificDetails}
+                  multiline={true}
+                  numberOfLines={3}
+                />
                 <View style={styles.buttonsContainer}>
                   <TouchableOpacity 
                     style={styles.requestButton} 
@@ -852,7 +876,17 @@ useEffect(() => {
 };
 
 const styles = StyleSheet.create({
-  // Add these styles to your existing stylesheet
+  textInput: {
+    backgroundColor: "#2e4f2e",
+    borderRadius: 5,
+    marginBottom: 20,
+    padding: 12,
+    color: "white",
+    borderWidth: 1,
+    borderColor: '#3e6f3e',
+    textAlignVertical: 'top',
+    minHeight: 20,
+  },
   cancelButton: {
     position: 'absolute',
     top: 10,

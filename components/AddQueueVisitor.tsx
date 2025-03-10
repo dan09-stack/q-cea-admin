@@ -28,7 +28,7 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
   const [concernsList, setConcernsList] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [ticketNumber, setTicketNumber] = useState("");
-
+  const [specificDetails, setSpecificDetails] = useState("");
   const showAlert = (message: string) => {
     if (Platform.OS === 'web') {
       window.alert(message);
@@ -124,6 +124,7 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
           status: 'waiting',
           queuePosition: queuePosition,
           userTicketNumber: newNumber,
+          specificDetails: specificDetails,
           program: "VST",
           userType: "STUDENT",
         });
@@ -217,6 +218,7 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
           </Picker>
         </View>
 
+
         {selectedConcern === "Other" && (
           <TextInput
             style={styles.input}
@@ -226,6 +228,13 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
           />
         )}
 
+        <Text style={styles.label}>Specific Details</Text>
+        <TextInput
+          style={styles.input}
+          value={specificDetails}
+          onChangeText={setSpecificDetails}
+          placeholder="Enter any specific details about your concern"
+        />
         <TouchableOpacity
           style={styles.submitButton}
           onPress={handleSubmit}

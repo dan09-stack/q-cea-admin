@@ -105,6 +105,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
           phoneNumber: formData.phoneNumber,
           program: formData.program,
           email: formData.email,
+          isVerified:true,
           userType: 'STUDENT'
         });
         await sendEmailVerification(user);

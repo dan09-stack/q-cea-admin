@@ -10,6 +10,8 @@ interface QueueInfoProps {
   onAddQueue: () => void;
   onAddQueueVisitor: () => void;
   onViewRatings: () => void;
+  onViewAllTickets: () => void;
+  onCancelAllQueues: () => void;
 }
 
 const QueueInfo: React.FC<QueueInfoProps> = ({
@@ -19,6 +21,8 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
   onAddQueue,
   onAddQueueVisitor,
   onViewRatings,
+  onViewAllTickets, 
+  onCancelAllQueues,
 }) => {
   const [queueCount, setQueueCount] = useState<number>(0); // State to store queue count
   const [unverifiedCount, setUnverifiedCount] = useState<number>(0);
@@ -81,11 +85,49 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
           )}
         </Text>
       </TouchableOpacity> */}
+      <View style={styles.headerButtonsContainer}>
+        <TouchableOpacity 
+          style={styles.viewTicketsButton}
+          onPress={onViewAllTickets}
+        >
+          <Text style={styles.buttonText}>View All Tickets</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.cancelAllButton}
+          onPress={onCancelAllQueues}
+        >
+          <Text style={styles.buttonText}>Cancel All Queues</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  headerButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  viewTicketsButton: {
+    backgroundColor: '#1E8449',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  cancelAllButton: {
+    backgroundColor: 'rgb(61, 57, 57)',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   container: {
     padding: 20,
     borderRadius: 10,
