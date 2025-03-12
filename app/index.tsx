@@ -1,18 +1,33 @@
-import React, { useState } from 'react';
-import { View, TextInput, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ImageBackground } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, TextInput, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
-import { verifyAdminCredentials } from '../services/adminAuth';
-import Ionicons from 'react-native-vector-icons/Ionicons'; 
+import { verifyAdminCredentials, resetAdminPassword } from './services/adminAuth';
+import { auth } from './../firebaseConfig';
+import { signOut } from 'firebase/auth';
 
 const Index = () => {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  // Ensure user is signed out on screen load
+  useEffect(() => {
+    const logout = async () => {
+      await signOut(auth); // Logs out any existing session
+    };
+    logout();
+  }, []);
 
   const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage('Please enter a valid email and password.');
+      return;
+    }
+
     try {
       setLoading(true);
       setErrorMessage('');
@@ -30,6 +45,29 @@ const Index = () => {
       setLoading(false);
     }
   };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Please enter your email first.');
+      return;
+    }
+
+    try {
+      setResetLoading(true);
+      const result = await resetAdminPassword(email);
+
+      if (result.success) {
+        Alert.alert('Password Reset', 'A password reset email has been sent. Please check your inbox.');
+      } else {
+        Alert.alert('Error', result.error || 'Password reset failed.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Try again.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
 
   return (
     <ImageBackground 
