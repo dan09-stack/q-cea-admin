@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { verifyAdminCredentials, resetAdminPassword } from './services/adminAuth';
 import { auth } from './../firebaseConfig';
 import { signOut } from 'firebase/auth';
+import { Ionicons } from '@expo/vector-icons';
 
 const Index = () => {
   const router = useRouter();
@@ -91,16 +92,16 @@ const Index = () => {
             style={styles.passwordInput}
             placeholder="Password"
             placeholderTextColor="#ccc"
-            secureTextEntry={!passwordVisible}
+            secureTextEntry={!showPassword}
             value={password}
             onChangeText={setPassword}
           />
           <TouchableOpacity
             style={styles.eyeButton}
-            onPress={() => setPasswordVisible(!passwordVisible)}
+            onPress={() => setShowPassword(!showPassword)}
           >
             <Ionicons
-              name={passwordVisible ? 'eye' : 'eye-off'}
+              name={showPassword ? 'eye' : 'eye-off'}
               size={20}
               color="#fff"
             />
