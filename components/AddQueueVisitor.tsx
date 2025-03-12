@@ -172,9 +172,7 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Add Visitor to Queue</Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Text style={styles.closeButtonText}>X</Text>
-        </TouchableOpacity>
+       
       </View>
 
       <View style={styles.formContainer}>

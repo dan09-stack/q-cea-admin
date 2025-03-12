@@ -243,9 +243,9 @@ const List: React.FC = () => {
         <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editButton}>
           <Icon name="create-outline" size={24} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteButton}>
+        {/* <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteButton}>
           <Icon name="trash-outline" size={24} color="#fff" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );
@@ -281,10 +281,7 @@ const List: React.FC = () => {
               <Text style={styles.filterText}>Faculty</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-            <Icon name="add-circle-outline" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Add User</Text>
-          </TouchableOpacity>
+          
         </View>
       </View>
 
