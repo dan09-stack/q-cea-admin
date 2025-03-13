@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, TextInput, ActivityInd
 import firebase from '@/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 
 const Profile: React.FC = () => {
   const [adminData, setAdminData] = useState<any>(null);
@@ -11,6 +12,10 @@ const Profile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
     const fetchAdminData = async () => {
@@ -32,26 +37,6 @@ const Profile: React.FC = () => {
 
     fetchAdminData();
   }, []);
-
-  const handleEdit = async () => {
-    if (isEditing) {
-      setIsSaving(true);
-      try {
-        const adminRef = firebase.firestore().collection('admin').doc('admin1');
-        await adminRef.update(adminData);
-        setIsEditing(false);
-        Alert.alert('Success', 'Profile updated successfully');
-      } catch (error) {
-        console.error('Error updating profile:', error);
-        Alert.alert('Error', 'Failed to update profile. Please try again.');
-      } finally {
-        setIsSaving(false);
-      }
-    } else {
-      setIsEditing(true);
-    }
-  };
-
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -98,18 +83,109 @@ const Profile: React.FC = () => {
     }
   };
 
+
+  const handleEdit = async () => {
+    if (isEditing) {
+      setIsSaving(true);
+      try {
+        // Check if password has changed
+        if (passwordChanged && newPassword) {
+          const user = firebase.auth().currentUser;
+          if (user) {
+            // Reauthenticate the user first
+            const credential = EmailAuthProvider.credential(
+              user.email || adminData.email,
+              currentPassword
+            );
+            
+            try {
+              await reauthenticateWithCredential(user, credential);
+              
+              // Update the password
+              await updatePassword(user, newPassword);
+              
+              // Update the stored password in Firestore (optional, for display purposes)
+              adminData.password = newPassword;
+              
+              Alert.alert('Success', 'Password updated successfully');
+              setPasswordChanged(false);
+              setCurrentPassword('');
+              setNewPassword('');
+            } catch (authError) {
+              console.error('Authentication error:', authError);
+              Alert.alert('Authentication Error', 'Current password is incorrect or you need to reauthenticate.');
+              setIsSaving(false);
+              return;
+            }
+          }
+        }
+        
+        // Update other profile data in Firestore
+        const adminRef = firebase.firestore().collection('admin').doc('admin1');
+        await adminRef.update(adminData);
+        setIsEditing(false);
+        Alert.alert('Success', 'Profile updated successfully');
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        Alert.alert('Error', 'Failed to update profile. Please try again.');
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setIsEditing(true);
+    }
+  };
+
+  // Add a method to handle password change
+  const handlePasswordChange = () => {
+    setPasswordChanged(true);
+    setShowPasswordModal(true);
+  };
+
+  // Modify renderProfileField to handle password field specially
   const renderProfileField = (label: string, field: string, isPassword = false) => (
     <View style={styles.fieldContainer}>
       <Text style={styles.fieldLabel}>{label}</Text>
       {isEditing ? (
-        <TextInput 
-          value={adminData[field]}
-          onChangeText={(text) => setAdminData({...adminData, [field]: text})}
-          style={styles.input}
-          secureTextEntry={isPassword}
-          placeholder={`Enter ${label.toLowerCase()}`}
-          placeholderTextColor="#666"
-        />
+        isPassword ? (
+          <View>
+            <TouchableOpacity 
+              style={styles.passwordChangeButton} 
+              onPress={handlePasswordChange}
+            >
+              <Text style={styles.passwordChangeText}>Change Password</Text>
+            </TouchableOpacity>
+            {passwordChanged && (
+              <>
+                <TextInput 
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  style={[styles.input, {marginTop: 10}]}
+                  secureTextEntry
+                  placeholder="Enter current password"
+                  placeholderTextColor="#666"
+                />
+                <TextInput 
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  style={[styles.input, {marginTop: 10}]}
+                  secureTextEntry
+                  placeholder="Enter new password"
+                  placeholderTextColor="#666"
+                />
+              </>
+            )}
+          </View>
+        ) : (
+          <TextInput 
+            value={adminData[field]}
+            onChangeText={(text) => setAdminData({...adminData, [field]: text})}
+            style={styles.input}
+            secureTextEntry={isPassword}
+            placeholder={`Enter ${label.toLowerCase()}`}
+            placeholderTextColor="#666"
+          />
+        )
       ) : (
         <Text style={styles.fieldValue}>{isPassword ? '••••••••' : adminData[field]}</Text>
       )}
@@ -157,7 +233,6 @@ const Profile: React.FC = () => {
                 {renderProfileField('Name', 'name')}
                 {renderProfileField('ID', 'id')}
                 {renderProfileField('Phone', 'phone')}
-                {renderProfileField('Email', 'email')}
                 {renderProfileField('Password', 'password', true)}
                 
                 <TouchableOpacity 
@@ -206,6 +281,16 @@ const { width } = Dimensions.get('window');
 const cardWidth = width > 700 ? 600 : width * 0.9;
 
 const styles = StyleSheet.create({
+  passwordChangeButton: {
+    backgroundColor: '#1a5620',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  passwordChangeText: {
+    color: '#fff',
+    fontWeight: '500',
+  },
   scrollContainer: {
     flexGrow: 1,
   },
