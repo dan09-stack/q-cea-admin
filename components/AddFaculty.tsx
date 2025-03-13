@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ScrollView,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebaseConfig";
-import { collection, addDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
+import { useAppTheme } from '../utils/theme';
 
 interface AddFacultyProps {
   onClose: () => void;
@@ -28,6 +29,15 @@ interface FacultyFormData {
 }
 
 const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
+  const { 
+    colors, 
+    getInputStyle, 
+    getPlaceholderColor, 
+    getButtonStyle, 
+    getContainerStyle, 
+    getTextStyle
+  } = useAppTheme();
+  
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FacultyFormData>({
     fullName: "",
@@ -38,6 +48,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     password: "",
     rfid_uid: "",
   });
+  
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
       window.alert(`${title}: ${message}`);
@@ -53,51 +64,29 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     { label: "B.S. Computer Engineering", value: "CPE" },
     { label: "B.S. Electrical Engineering", value: "EE" },
     { label: "B.S. Electronics Engineering", value: "ECE" },
-    { label: "B.S. Mechanical Engineering", value: "ME" }
+    { label: "B.S. Mechanical Engineering", value: "ME" },
+    { label: "Program Head-Architecture", value: "PH-ARCH" },
+    { label: "Program Head-Civil Engineering", value: "PH-CE" },
+    { label: "Program Head-Computer Engineering", value: "PH-CPE" },
+    { label: "Program Head-Electrical Engineering", value: "PH-EE" },
+    { label: "Program Head-Electronics Engineering", value: "PH-ECE" },
+    { label: "Program Head-Mechanical Engineering", value: "PH-ME" },
+    { label: "Dean", value: "DEAN" },
   ];
 
   const validateForm = () => {
-    console.log("Validating form data:", formData); // Add this
     if (!formData.fullName || !formData.idNumber || !formData.program || 
         !formData.phoneNumber || !formData.email || !formData.password || !formData.rfid_uid) {
-      console.log("Validation failed: Missing fields"); // Add this
       showAlert("Error", "Please fill in all fields");
       return false;
     }
-    // if (!formData.email.endsWith("@phinmaed.com")) {
-    //   console.log("Validation failed: Invalid email"); // Add this
-    //   showAlert("Error", "Please use a valid PHINMA email address");
-    //   return false;
-    // }
     return true;
   };
 
   const handleAdd = async () => {
-    console.log("Add button clicked"); // Add this
     if (validateForm()) {
-      console.log("Form validated"); // Add this
       setIsLoading(true);
       try {
-        console.log("Starting user creation"); // Add this
-        // const userCredential = await createUserWithEmailAndPassword(
-        //   auth,
-        //   formData.email,
-        //   formData.password
-        // );
-        // console.log("User created:", userCredential); // Add this
-  
-        // const userRef = collection(db, 'student');
-        // await addDoc(userRef, {
-        //   uid: userCredential.user.uid,
-        //   fullName: formData.fullName,
-        //   idNumber: formData.idNumber,
-        //   program: formData.program,
-        //   phoneNumber: formData.phoneNumber,
-        //   email: formData.email,
-        //   userType: 'student',
-        //   createdAt: new Date().toISOString()
-        // });
-
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const user = userCredential.user;
 
@@ -107,156 +96,209 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           phoneNumber: formData.phoneNumber,
           program: formData.program,
           email: formData.email,
-          isVerified:true,
+          isVerified: true,
           userType: 'FACULTY',
-          numOnQueue:0,
+          numOnQueue: 0,
           status: 'OFFLINE',
           rfid_uid: formData.rfid_uid,
           createdAt: new Date().toISOString()
         });
-         await sendEmailVerification(user);
+        await sendEmailVerification(user);
   
         showAlert("Success", "Faculty member added successfully");
         onClose();
       } catch (error: any) {
-        console.error("Detailed error:", error); // Add detailed logging
+        console.error("Detailed error:", error);
         showAlert(
           "Error", 
-          error.message || "Failed to add faculty member" // Show actual error message
+          error.message || "Failed to add faculty member"
         );
       } finally {
         setIsLoading(false);
       }
     }
   };
-
+  
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>ADD FACULTY</Text>
+    <View style={getContainerStyle(styles.outerContainer)}>
+      <Text style={getTextStyle(styles.title, true)}>REGISTER FACULTY</Text>
+      
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={true}
+      >
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>Full Name</Text>
+          <TextInput
+            style={[getInputStyle(styles.input), styles.whiteBackground]}
+            placeholder="Last Name, First Name"
+            placeholderTextColor={getPlaceholderColor()}
+            value={formData.fullName}
+            onChangeText={(text) => setFormData({...formData, fullName: text})}
+          />
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Last Name, First Name"
-        placeholderTextColor="#000000"
-        value={formData.fullName}
-        onChangeText={(text) => setFormData({...formData, fullName: text})}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="ID Number"
-        placeholderTextColor="#000000"
-        value={formData.idNumber}
-        onChangeText={(text) => setFormData({...formData, idNumber: text})}
-      />
-      <TextInput
-              style={styles.input}
-              placeholder="RFID UID"
-              placeholderTextColor="#000000"
-              value={formData.rfid_uid}
-              onChangeText={(text) => setFormData({...formData, rfid_uid: text})}
-            />
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={formData.program}
-          onValueChange={(itemValue) => setFormData({...formData, program: itemValue})}
-          style={styles.picker}
-        >
-          {programs.map((program, index) => (
-            <Picker.Item 
-              key={index}
-              label={program.label} 
-              value={program.value} 
-            />
-          ))}
-        </Picker>
-      </View>
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>ID Number</Text>
+          <TextInput
+            style={[getInputStyle(styles.input), styles.whiteBackground]}
+            placeholder="ID Number"
+            placeholderTextColor={getPlaceholderColor()}
+            value={formData.idNumber}
+            onChangeText={(text) => setFormData({...formData, idNumber: text})}
+          />
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Phone Number"
-        placeholderTextColor="#000000"
-        keyboardType="phone-pad"
-        value={formData.phoneNumber}
-        onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="PHINMA Email"
-        placeholderTextColor="#000000"
-        keyboardType="email-address"
-        value={formData.email}
-        onChangeText={(text) => setFormData({...formData, email: text})}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#000000"
-        // secureTextEntry
-        value={formData.password}
-        onChangeText={(text) => setFormData({...formData, password: text})}
-      />
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>RFID UID</Text>
+          <TextInput
+            style={[getInputStyle(styles.input), styles.whiteBackground]}
+            placeholder="RFID UID"
+            placeholderTextColor={getPlaceholderColor()}
+            value={formData.rfid_uid}
+            onChangeText={(text) => setFormData({...formData, rfid_uid: text})}
+          />
+        </View>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-          <Text style={styles.buttonText}>CANCEL</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.addButton]} 
-          onPress={() => {
-            handleAdd();
-          }}        >
-          <Text  style={styles.buttonText}>ADD</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>Program</Text>
+          <View style={[getInputStyle(styles.pickerContainer), styles.whiteBackground]}>
+            <Picker
+              selectedValue={formData.program}
+              onValueChange={(itemValue) => setFormData({...formData, program: itemValue})}
+              style={[styles.picker, { color: colors.text }]}
+            >
+              {programs.map((program, index) => (
+                <Picker.Item 
+                  key={index}
+                  label={program.label} 
+                  value={program.value}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>Phone Number</Text>
+          <TextInput
+            style={[getInputStyle(styles.input), styles.whiteBackground]}
+            placeholder="Phone Number"
+            placeholderTextColor={getPlaceholderColor()}
+            keyboardType="phone-pad"
+            value={formData.phoneNumber}
+            onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>Email</Text>
+          <TextInput
+            style={[getInputStyle(styles.input), styles.whiteBackground]}
+            placeholder="PHINMA Email"
+            placeholderTextColor={getPlaceholderColor()}
+            keyboardType="email-address"
+            value={formData.email}
+            onChangeText={(text) => setFormData({...formData, email: text})}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>Password</Text>
+          <TextInput
+            style={[getInputStyle(styles.input), styles.whiteBackground]}
+            placeholder="Password"
+            placeholderTextColor={getPlaceholderColor()}
+            secureTextEntry
+            value={formData.password}
+            onChangeText={(text) => setFormData({...formData, password: text})}
+          />
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={getButtonStyle(styles.cancelButton, true)} 
+            onPress={onClose}
+          >
+            <Text style={styles.buttonText}>CANCEL</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={getButtonStyle(styles.addButton)} 
+            onPress={handleAdd}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>{isLoading ? 'ADDING...' : 'ADD'}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  disabledButton: {
-    backgroundColor: '#666',
-    opacity: 0.7,
-  },
-  container: {
-    marginTop: 50,
+  outerContainer: {
     margin: 20,
     width: "70%",
-    backgroundColor: "#032911",
-    alignItems: "center",
+    height: "78%", // Set a specific height to ensure scrolling works
     padding: 30,
     borderRadius: 15, 
+    borderWidth: 1,
+    borderColor: "#800020",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 30,
+    marginBottom: 20,
+    textAlign: "left",
+    width: "100%",
+  },
+  scrollView: {
+    flex: 1,    
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    paddingTop: 20,
+  },
+  scrollViewContent: {
+    alignItems: "center",
+    paddingBottom: 20,
+  },
+  inputContainer: {
+    width: "90%",
+    marginBottom: 15,
+    
+  },
+  inputLabel: {
+    fontSize: 16,
+    marginBottom: 5,
+    fontWeight: "500",
+    textAlign: "left",
+    width: "100%",
   },
   input: {
-    width: "90%",
+    width: "100%",
     height: 50,
-    backgroundColor: "#f2efef",
     borderRadius: 5,
     paddingHorizontal: 15,
-    marginBottom: 15,
-    color: "#000000",
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  whiteBackground: {
+    backgroundColor: "white",
   },
   pickerContainer: {
-    width: "90%",
+    width: "100%",
     height: 50,
-    backgroundColor: "#f2efef",
     borderRadius: 5,
     justifyContent: "center",
-    marginBottom: 15,
     overflow: "hidden",
   },
   picker: {
-    borderColor: "#f2efef",
-    backgroundColor: "#f2efef",
-    color: "#000000",
     width: "100%",
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   buttonContainer: {
     flexDirection: "row",
@@ -267,7 +309,6 @@ const styles = StyleSheet.create({
   cancelButton: {
     width: "45%",
     height: 50,
-    backgroundColor: "#1c4e1e",
     borderRadius: 5,
     justifyContent: "center",
     alignItems: "center",
@@ -275,7 +316,6 @@ const styles = StyleSheet.create({
   addButton: {
     width: "45%",
     height: 50,
-    backgroundColor: "#0f790f",
     borderRadius: 5,
     justifyContent: "center",
     alignItems: "center",

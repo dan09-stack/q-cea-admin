@@ -10,7 +10,8 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
-  ScrollView
+  ScrollView,
+  Image
 } from 'react-native';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -252,6 +253,7 @@ const List: React.FC = () => {
 
   return (
     <View style={styles.container}>
+   
       <View style={styles.header}>
         <Text style={styles.title}>Users List</Text>
         <View style={styles.filterContainer}>
@@ -266,19 +268,19 @@ const List: React.FC = () => {
               style={[styles.filterButton, filterType === 'ALL' && styles.activeFilter]} 
               onPress={() => setFilterType('ALL')}
             >
-              <Text style={styles.filterText}>All</Text>
+              <Text style={[styles.filterText, filterType === 'ALL' && styles.activeFilterText]}>All</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.filterButton, filterType === 'STUDENT' && styles.activeFilter]} 
               onPress={() => setFilterType('STUDENT')}
             >
-              <Text style={styles.filterText}>Students</Text>
+              <Text style={[styles.filterText, filterType === 'STUDENT' && styles.activeFilterText]}>Students</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.filterButton, filterType === 'FACULTY' && styles.activeFilter]} 
               onPress={() => setFilterType('FACULTY')}
             >
-              <Text style={styles.filterText}>Faculty</Text>
+              <Text style={[styles.filterText, filterType === 'FACULTY' && styles.activeFilterText]}>Faculty</Text>
             </TouchableOpacity>
           </View>
           
@@ -585,7 +587,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#800020',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
@@ -624,8 +626,11 @@ const styles = StyleSheet.create({
   activeFilter: {
     backgroundColor: '#fff',
   },
+  activeFilterText: {
+    color: '#000',
+  },
   filterText: {
-    color: '#333',
+    color: '#fff',
     fontWeight: '500',
   },
   addButton: {

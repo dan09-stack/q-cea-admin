@@ -40,7 +40,7 @@ const AdminDashboard: React.FC = () => {
         />
       </View>
       <LinearGradient
-        colors={['#4CAF50', '#2E7D32', '#1B5E20']}
+        colors={['#fff', '#fff', '#fff']}
         style={styles.content}
       >
         {currentView === 'addFaculty' ? (
@@ -53,6 +53,8 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewAllTickets={() => alert('View All Tickets')}
+              onCancelAllQueues={() => alert('Cancel All Queues')}
             />
           </View>
         ) : currentView === 'addStudent' ? (
@@ -65,6 +67,8 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewAllTickets={() => alert('View All Tickets')}
+              onCancelAllQueues={() => alert('Cancel All Queues')}
             />
           </View>
         ) : currentView === 'verifyFaculty' ? (
@@ -77,6 +81,8 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewAllTickets={() => alert('View All Tickets')}
+              onCancelAllQueues={() => alert('Cancel All Queues')}
             />
           </View>
         ) : currentView === 'addQueue' ? (
@@ -89,6 +95,8 @@ const AdminDashboard: React.FC = () => {
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
+              onViewAllTickets={() => alert('View All Tickets')}
+              onCancelAllQueues={() => alert('Cancel All Queues')}
             />
           </View>
         ) : currentView === 'addQueueVisitor' ? (
@@ -101,6 +109,8 @@ const AdminDashboard: React.FC = () => {
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
+              onViewAllTickets={() => alert('View All Tickets')}
+              onCancelAllQueues={() => alert('Cancel All Queues')}
             />
           </View>
         ) : currentView === 'profile' ? (
@@ -121,6 +131,8 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewAllTickets={() => alert('View All Tickets')}
+              onCancelAllQueues={() => alert('Cancel All Queues')}
             />
           </View>
           
@@ -135,6 +147,7 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     flexDirection: "row",
+    backgroundColor: "#000",
   },
   sidebar: { 
     flex: 0.08, 
@@ -142,7 +155,8 @@ const styles = StyleSheet.create({
   },
   content: { 
     flex: .92,
-    // Remove the backgroundColor property as it's now handled by LinearGradient
+    borderRadius: 10,
+    margin: 1,
   },
   FacultyList: { 
     flex: 1,

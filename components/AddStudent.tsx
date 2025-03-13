@@ -12,6 +12,7 @@ import { db, auth } from "../firebaseConfig";
 import { collection, addDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
+import { useAppTheme } from '../utils/theme';
 
 interface AddStudentProps {
   onClose: () => void;
@@ -27,6 +28,14 @@ interface StudentFormData {
 }
 
 const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
+    const { 
+      colors, 
+      getInputStyle, 
+      getPlaceholderColor, 
+      getButtonStyle, 
+      getContainerStyle, 
+      getTextStyle
+    } = useAppTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<StudentFormData>({
     fullName: "",
@@ -126,123 +135,166 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>ADD STUDENT</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Last Name, First Name"
-        placeholderTextColor="#000000"
-        value={formData.fullName}
-        onChangeText={(text) => setFormData({...formData, fullName: text})}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="ID Number"
-        placeholderTextColor="#000000"
-        value={formData.idNumber}
-        onChangeText={(text) => setFormData({...formData, idNumber: text})}
-      />
-
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={formData.program}
-          onValueChange={(itemValue) => setFormData({...formData, program: itemValue})}
-          style={styles.picker}
-        >
-          {programs.map((program, index) => (
-            <Picker.Item 
-              key={index}
-              label={program.label} 
-              value={program.value} 
-            />
-          ))}
-        </Picker>
+      <Text style={getTextStyle(styles.title, true)}>REGISTER STUDENT</Text>
+      <View style={getContainerStyle(styles.formGroup)}>
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Full Name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Last Name, First Name"
+          placeholderTextColor="#000000"
+          value={formData.fullName}
+          onChangeText={(text) => setFormData({...formData, fullName: text})}
+        />
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Phone Number"
-        placeholderTextColor="#000000"
-        keyboardType="phone-pad"
-        value={formData.phoneNumber}
-        onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="PHINMA Email"
-        placeholderTextColor="#000000"
-        keyboardType="email-address"
-        value={formData.email}
-        onChangeText={(text) => setFormData({...formData, email: text})}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#000000"
-        // secureTextEntry
-        value={formData.password}
-        onChangeText={(text) => setFormData({...formData, password: text})}
-      />
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>ID Number</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="ID Number"
+          placeholderTextColor="#000000"
+          value={formData.idNumber}
+          onChangeText={(text) => setFormData({...formData, idNumber: text})}
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Program</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={formData.program}
+            onValueChange={(itemValue) => setFormData({...formData, program: itemValue})}
+            style={styles.picker}
+          >
+            {programs.map((program, index) => (
+              <Picker.Item 
+                key={index}
+                label={program.label} 
+                value={program.value} 
+              />
+            ))}
+          </Picker>
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Phone Number</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Phone Number"
+          placeholderTextColor="#000000"
+          keyboardType="phone-pad"
+          value={formData.phoneNumber}
+          onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="PHINMA Email"
+          placeholderTextColor="#000000"
+          keyboardType="email-address"
+          value={formData.email}
+          onChangeText={(text) => setFormData({...formData, email: text})}
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#000000"
+          // secureTextEntry
+          value={formData.password}
+          onChangeText={(text) => setFormData({...formData, password: text})}
+        />
+      </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+        <TouchableOpacity style={getButtonStyle(styles.cancelButton, true)} onPress={onClose}>
           <Text style={styles.buttonText}>CANCEL</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.addButton]} 
+          style={getButtonStyle(styles.addButton)} 
           onPress={() => {
             handleAdd();
           }}        >
-
-  <Text  style={styles.buttonText}>ADD</Text>
-</TouchableOpacity>
+          <Text style={styles.buttonText}>ADD</Text>
+        </TouchableOpacity>
+      </View>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  formGroup: {
+    width: "100%",
+    backgroundColor: "#ccc",
+  },
   disabledButton: {
     backgroundColor: '#666',
     opacity: 0.7,
   },
   container: {
-    marginTop: 50,
     margin: 20,
     width: "70%",
-    backgroundColor: "#032911",
+    backgroundColor: "#fff",
     alignItems: "center",
     padding: 30,
     borderRadius: 15, 
+    borderColor: '#800020',
+    borderWidth: 1,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#000",
     marginBottom: 30,
+    flex: 1,
+    textAlign: "left",
+    width: "100%",
+  },
+  inputContainer: {
+    width: "90%",
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 5,
+    color: "#333",
+    textAlign: "left",
+    width: "100%",
   },
   input: {
-    width: "90%",
+    width: "100%",
     height: 50,
-    backgroundColor: "#f2efef",
+    backgroundColor: "#ffffff",
     borderRadius: 5,
     paddingHorizontal: 15,
-    marginBottom: 15,
     color: "#000000",
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
   },
   pickerContainer: {
-    width: "90%",
+    width: "100%",
     height: 50,
-    backgroundColor: "#f2efef",
+    backgroundColor: "#ffffff",
     borderRadius: 5,
     justifyContent: "center",
-    marginBottom: 15,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: '#ccc',
   },
   picker: {
-    borderColor: "#f2efef",
-    backgroundColor: "#f2efef",
+    borderColor: "#ffffff",
+    backgroundColor: "#ffffff",
     color: "#000000",
     width: "100%",
     fontSize: 16,
@@ -275,5 +327,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+
 
 export default AddStudentScreen;

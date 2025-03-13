@@ -58,7 +58,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
       {/* Queue Count Section */}
       <View style={styles.queueCountContainer}>
         <Text style={styles.queueTitle}>TOTAL</Text>
-        <Text style={styles.queueTitle}>STUDENT ON QUEUE</Text>
+        <Text style={styles.queueTitle}>WAITING STUDENT</Text>
         <Text style={styles.queueCount}>{queueCount}</Text> {/* Display the queueCount */}
       </View>
 
@@ -85,7 +85,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
           )}
         </Text>
       </TouchableOpacity> */}
-      <View style={styles.headerButtonsContainer}>
+      {/* <View style={styles.headerButtonsContainer}>
         <TouchableOpacity 
           style={styles.viewTicketsButton}
           onPress={onViewAllTickets}
@@ -98,7 +98,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
         >
           <Text style={styles.buttonText}>Cancel All Queues</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
     </View>
   );
 };
@@ -133,31 +133,41 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   queueCountContainer: {
-    backgroundColor: "#0d3310", // Green background
+    backgroundColor: "#fff", // Green background
     padding: 20,
     borderRadius: 10,
     marginBottom: 20,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#800020",
   },
   queueTitle: {
     fontSize: 30,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#800020",
     marginBottom: 5,
   },
   queueCount: {
     fontSize: 48,
     fontWeight: "bold",
-    color: "#fff",
+    color: "#000",
   },
   button: {
-    backgroundColor: "#333", 
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 5,
-    color: "#fff",
+    padding: 15,
+    borderRadius: 8,
+    marginVertical: 8,
     textAlign: "center",
+    fontWeight: "bold",
+    color: "#800020",
+    fontSize: 16,
+    elevation: 3,
+    borderColor: "#800020",
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
 });
 

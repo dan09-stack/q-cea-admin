@@ -13,6 +13,7 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDoc, setDoc, increment, getDocs } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { useAppTheme } from "@/utils/theme";
 
 interface AddQueueVisitorProps {
   onClose: () => void;
@@ -167,11 +168,18 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
     const faculty = facultyList.find(f => f.id === itemValue);
     setSelectedFacultyName(faculty ? faculty.fullName : "");
   };
-
+  const { 
+    colors, 
+    getInputStyle, 
+    getPlaceholderColor, 
+    getButtonStyle, 
+    getContainerStyle, 
+    getTextStyle
+  } = useAppTheme();
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Add Visitor to Queue</Text>
+        <Text style={getTextStyle(styles.headerText, true)}>Add Visitor to Queue</Text>
        
       </View>
 
@@ -234,7 +242,7 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
           placeholder="Enter any specific details about your concern"
         />
         <TouchableOpacity
-          style={styles.submitButton}
+          style={getButtonStyle(styles.submitButton)}
           onPress={handleSubmit}
           disabled={isLoading}
         >
@@ -254,6 +262,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor:"#800020",
+    borderRadius: 10,
+    margin: 20,
   },
   header: {
     flexDirection: "row",

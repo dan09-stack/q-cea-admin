@@ -163,7 +163,7 @@ const Profile: React.FC = () => {
                   style={[styles.input, {marginTop: 10}]}
                   secureTextEntry
                   placeholder="Enter current password"
-                  placeholderTextColor="#666"
+                  placeholderTextColor="#000"
                 />
                 <TextInput 
                   value={newPassword}
@@ -171,7 +171,7 @@ const Profile: React.FC = () => {
                   style={[styles.input, {marginTop: 10}]}
                   secureTextEntry
                   placeholder="Enter new password"
-                  placeholderTextColor="#666"
+                  placeholderTextColor="#000"
                 />
               </>
             )}
@@ -212,17 +212,17 @@ const Profile: React.FC = () => {
             <TouchableOpacity onPress={pickImage} style={styles.imageContainer} disabled={isUploading}>
               {isUploading ? (
                 <View style={styles.profileImage}>
-                  <ActivityIndicator size="large" color="#fff" />
+                  <ActivityIndicator size="large" color="#000" />
                 </View>
               ) : imageUrl ? (
                 <Image source={{ uri: imageUrl }} style={styles.profileImage} />
               ) : (
                 <View style={styles.placeholderImage}>
-                  <Ionicons name="person-add" size={40} color="#fff" />
+                  <Ionicons name="person-add" size={40} color="#000" />
                 </View>
               )}
               <View style={styles.editIconContainer}>
-                <Ionicons name="camera" size={20} color="#fff" />
+                <Ionicons name="camera" size={20} color="#000" />
               </View>
             </TouchableOpacity>
           </View>
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: '#fff',
   },
   loadingText: {
     marginTop: 10,
@@ -316,16 +316,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     paddingVertical: 15,
-    backgroundColor: '#0d3310', // Darker green header
     borderRadius: 10,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#800020',
   },
   card: {
-    backgroundColor: '#1e1e1e', // Dark card background
+    backgroundColor: '#fff', // Dark card background
     borderRadius: 15,
     padding: 20,
     width: cardWidth,
@@ -382,27 +381,27 @@ const styles = StyleSheet.create({
   fieldContainer: {
     marginBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#333', // Darker separator
+    borderBottomColor: '#333', 
     paddingBottom: 10,
   },
   fieldLabel: {
     fontSize: 14,
-    color: '#a0a0a0', // Lighter gray for labels
+    color: '#000', 
     marginBottom: 5,
   },
   fieldValue: {
     fontSize: 18,
-    color: '#e0e0e0', // Light gray for text
+    color: '#000',
     fontWeight: '500',
   },
   input: {
     fontSize: 18,
-    backgroundColor: '#2e2e2e', // Dark input background
+    backgroundColor: '#fff',
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#444',
-    color: '#e0e0e0', // Light text color
+    color: '#000', // Light text color
   },
   actionButton: {
     flexDirection: 'row',
@@ -413,10 +412,10 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   editButton: {
-    backgroundColor: '#1a5620', // Darker green
+    backgroundColor: '#800020', // Darker green
   },
   saveButton: {
-    backgroundColor: 'rgb(10, 51, 10)', // Darker green
+    backgroundColor: 'rgb(81, 21, 21)', // Darker green
   },
   cancelButton: {
     backgroundColor: 'rgba(67, 28, 28, 0.48)', // Dark red

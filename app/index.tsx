@@ -95,8 +95,8 @@ const Index = () => {
       
       {/* Right Section with Login Form */}
       <View style={styles.rightContainer}>
-        <Image source={require('../assets/images/favicon.png')} style={styles.avatar} />
-        <Text style={styles.welcomeText}>WELCOME</Text>
+        <Image source={require('../assets/images/typing.gif')} style={styles.avatar} />
+        <Text style={styles.welcomeText}>WELCOME ADMIN</Text>
         
         {/* Email/Username Input */}
         <View style={styles.inputContainer}>
@@ -175,7 +175,7 @@ const Index = () => {
                 style={styles.modalCancelButton}
                 onPress={() => setForgotPasswordVisible(false)}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
+                <Text style={styles.cancelModalText}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -217,7 +217,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 50,
     borderBottomLeftRadius: 50,
-    justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
     shadowColor: '#000',
@@ -227,10 +226,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   avatar: {
-    width: 60,
-    height: 60,
+    width: 300,
     borderRadius: 30,
-    marginBottom: 10,
+    marginTop: "20%",
   },
   welcomeText: {
     fontSize: 22,
@@ -254,6 +252,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   input: {
+    paddingLeft: 10,
     flex: 1,
     height: 40,
     fontSize: 16,
@@ -306,7 +305,7 @@ const styles = StyleSheet.create({
     color: '#800020', // Maroon color for modal title
   },
   modalText: {
-    color: '#666',
+    color: '#000',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -343,6 +342,9 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  cancelModalText: {
+    color: '#000',
   }
 });
 

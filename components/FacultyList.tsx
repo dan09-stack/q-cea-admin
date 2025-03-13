@@ -80,6 +80,7 @@ const FacultyList: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      
       <Text style={styles.title}>LIST OF FACULTY</Text>
       <View style={styles.searchContainer}>
         <TextInput
@@ -124,7 +125,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   noResultsText: {
-    color: '#f3f3f3',
+    color: '#333', // Changed from #f3f3f3 to dark color
     fontSize: 16,
     textAlign: 'center',
   }, 
@@ -132,17 +133,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: "space-between",
-
     backgroundColor: 'white',
     borderRadius: 5,
     marginBottom: 10,
     width: '100%',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 2,
-    borderBottomColor: '#f3f3f3',
+    borderBottomColor: '#ddd',
     paddingBottom: 5,
     marginBottom: 10,
   },
@@ -153,12 +155,13 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   container: { 
-    marginTop: 50,
     margin: 20,
     width: "70%",
-    backgroundColor: '#032911',
+    backgroundColor: 'white', // Changed from #032911 to white
     padding: 30,  
     borderRadius: 15, 
+    borderColor: '#800020',
+    borderWidth: 1,
   },
   headerRow: {
     flexDirection: "row",
@@ -170,19 +173,20 @@ const styles = StyleSheet.create({
   headerText: {
     fontWeight: "bold",
     fontSize: 20,
-    color: "white",
+    color: "black", // Changed from white to black
   },
   searchInput: {
     height: 40,
     width: "98%",
     borderColor: '#ddd',
+    
     paddingHorizontal: 10,
   },
   title: { 
     fontWeight: "bold", 
     fontSize: 25, 
     marginBottom: 15, 
-    color: "white" 
+    color: "#800020" 
   },
   row: { 
     flexDirection: "row", 
@@ -193,14 +197,14 @@ const styles = StyleSheet.create({
   },
   name: { 
     fontSize: 15, 
-    color: "white" 
+    color: "black" // Changed from white to black
   },
   status: {
     fontSize: 15
   },
   studentCount: {
     fontSize: 15,
-    color: "white"
+    color: "black" // Changed from white to black
   }
 });
 

@@ -13,6 +13,7 @@ import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, on
   increment} from 'firebase/firestore';
 import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
+import { useAppTheme } from "@/utils/theme";
 
 const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [showPriorityModal, setShowPriorityModal] = useState(false);
@@ -676,7 +677,14 @@ useEffect(() => {
       </ScrollView>
     </View>
   );
-  
+  const { 
+    colors, 
+    getInputStyle, 
+    getPlaceholderColor, 
+    getButtonStyle, 
+    getContainerStyle, 
+    getTextStyle
+  } = useAppTheme();
 
   return (
     <View style={styles.container}>
@@ -686,10 +694,10 @@ useEffect(() => {
       ) : (
         <>
          <View style={styles.headerContainer}>
-            <Text style={styles.title}>ADD QUEUE</Text>
+            <Text style={getTextStyle(styles.title, true)}>ADD QUEUE</Text>
             <View style={styles.headerButtonsContainer}>
               <TouchableOpacity 
-                style={styles.viewTicketsButton}
+                style={getButtonStyle(styles.viewTicketsButton)}
                 onPress={() => setShowTicketOverview(true)}
               >
                 <Text style={styles.buttonText}>View All Tickets</Text>
@@ -854,13 +862,13 @@ useEffect(() => {
                 />
                 <View style={styles.buttonsContainer}>
                   <TouchableOpacity 
-                    style={styles.requestButton} 
+                    style={getButtonStyle(styles.requestButton)} 
                     onPress={handleRequest}
                   >
                     <Text style={styles.buttonText}>ADD TO QUEUE</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    style={styles.closeButton} 
+                    style={getButtonStyle(styles.closeButton, true)} 
                     onPress={handleCancel}
                   >
                     <Text style={styles.buttonText}>CANCEL</Text>
@@ -877,13 +885,12 @@ useEffect(() => {
 
 const styles = StyleSheet.create({
   textInput: {
-    backgroundColor: "#2e4f2e",
     borderRadius: 5,
     marginBottom: 20,
     padding: 12,
     color: "white",
     borderWidth: 1,
-    borderColor: '#3e6f3e',
+    borderColor: '#ddd',
     textAlignVertical: 'top',
     minHeight: 20,
   },
@@ -900,10 +907,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   container: {
+    margin: 20,
     flex: 1,
-    backgroundColor: "#0d3310",
+    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 8,
+    borderColor: '#800020',
+    borderWidth: 1,
   },
   headerContainer: {
     marginBottom: 20,
@@ -916,7 +926,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000',
     marginBottom: 5,
   },
   viewTicketsButton: {
@@ -950,11 +960,11 @@ const styles = StyleSheet.create({
   formGroup: {
     flex: 1,
     padding: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f9f9f9',
     borderRadius: 10,
   },
   formLabel: {
-    color: '#fff',
+    color: '#000',
     fontSize: 16,
     marginBottom: 8,
     fontWeight: '600',
@@ -965,10 +975,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: '#3e6f3e',
+    borderColor: '#ddd',
   },
   picker: {
-    color: "black",
     width: "100%",
     height: 50,
   },
@@ -995,7 +1004,7 @@ const styles = StyleSheet.create({
     flex: .2,
   },
   ticketContainerCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#f9f9f9",
     borderRadius: 10,
     padding: 20,
     elevation: 5,
@@ -1089,7 +1098,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   queueAgainButton: {
-    backgroundColor: '#1E8449',
+    backgroundColor: '#800020',
     borderRadius: 5,
     paddingVertical: 12,
     width: '48%',
