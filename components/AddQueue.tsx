@@ -1,15 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity, Platform } from "react-native";
+import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity, Platform, ScrollView } from "react-native";
 import { Picker } from '@react-native-picker/picker';
 import { auth, db } from '@/firebaseConfig';
 import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, onSnapshot, updateDoc, QueryConstraint,
   WhereFilterOp, 
   orderBy,
-  limit} from 'firebase/firestore';
+  
+  limit,
+  writeBatch,
+  query,
+  where,
+  increment} from 'firebase/firestore';
 import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 
 const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [showPriorityModal, setShowPriorityModal] = useState(false);
+const [priorityName, setPriorityName] = useState('');
+const [priorityId, setPriorityId] = useState('');
   const [selectedFaculty, setSelectedFaculty] = useState('');
   const [selectedConcern, setSelectedConcern] = useState('');
   const [otherConcern, setOtherConcern] = useState('');
@@ -221,7 +229,136 @@ useEffect(() => {
   
     return () => unsubscribe();
   }, [selectedStudent, currentDisplayedTicket, userTicketNumber]);
+  // Add this function to check if current time is after hours
+  const isAfterHours = (): boolean => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    // After hours is between 6:00 PM (18) and 5:00 AM (5)
+    return currentHour >= 18 || currentHour < 5;
+  };
+  
+  // Add this function to automatically cancel queues during after hours
+  const checkAndCancelAfterHoursQueues = async () => {
+    if (isAfterHours()) {
+      console.log("After hours detected - cancelling all queues");
+      try {
+        const studentsCollectionRef = collection(db, 'student');
+        const waitingStudentsQuery = firestoreQuery(
+          studentsCollectionRef, 
+          firestoreWhere('status', '==', 'waiting')
+        );
+        
+        // Get faculty status for reference
+        const facultyQuery = firestoreQuery(
+          studentsCollectionRef,
+          firestoreWhere('userType', '==', 'FACULTY')
+        );
+        
+        const facultySnapshot = await getDocs(facultyQuery);
+        const batch = writeBatch(db);
+        
+        if (!facultySnapshot.empty) {
+          facultySnapshot.docs.forEach((docSnapshot: DocumentSnapshot) => {
+            const facultyRef = doc(db, 'student', docSnapshot.id);
+            batch.update(facultyRef, {
+              status: 'OFFLINE'
+            });
+          });
+        }
+        
+        // If there are no waiting students, no need to proceed
+        const waitingStudentsSnapshot = await getDocs(waitingStudentsQuery);
+        if (waitingStudentsSnapshot.empty) {
+          console.log("No active queues to cancel");
+          await batch.commit();
+          return;
+        }
+        
+        await handleCancelAllQueues();
+        console.log("Successfully cancelled all queues due to after hours");
+      } catch (error) {
+        console.error('Error in automatic queue cancellation:', error);
+      }
+    }
+  };
+  
+  // Add this useEffect to check time periodically
+  useEffect(() => {
+    // Check immediately when component mounts
+    checkAndCancelAfterHoursQueues();
+    
+    // Set up interval to check every minute
+    const intervalId = setInterval(checkAndCancelAfterHoursQueues, 60000);
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []);
 
+
+  const handleCancelAllQueues = async () => {
+    try {
+      // Confirm cancellation first
+      // if (!confirm('Are you sure you want to cancel ALL queues? This action cannot be undone.')) {
+      //   return;
+      // }
+      
+      // Get all waiting students in queues
+      const studentsCollectionRef = collection(db, 'student');
+      const waitingStudentsQuery = firestoreQuery(
+        studentsCollectionRef, 
+        firestoreWhere('status', '==', 'waiting')
+      );
+      
+      const waitingStudentsSnapshot = await getDocs(waitingStudentsQuery);
+      
+      // Get all faculty users
+      const facultyQuery = firestoreQuery(
+        studentsCollectionRef,
+        firestoreWhere('userType', '==', 'FACULTY')
+      );
+      
+      const facultySnapshot = await getDocs(facultyQuery);
+      
+      // Batch update to cancel all queues and reset faculty queue counts
+      const batch = writeBatch(db);
+      
+      // Update all waiting students
+      if (!waitingStudentsSnapshot.empty) {
+        waitingStudentsSnapshot.docs.forEach((docSnapshot) => {
+          const studentRef = doc(db, 'student', docSnapshot.id);
+          batch.update(studentRef, {
+            status: 'completed',
+            userTicketNumber: null,
+            faculty: null,
+            concern: null,
+            otherConcern: null,
+            requestDate: null,
+            queuePosition: null
+          });
+        });
+      }
+      
+      // Update all faculty members to reset numOnQueue
+      if (!facultySnapshot.empty) {
+        facultySnapshot.docs.forEach((docSnapshot) => {
+          const facultyRef = doc(db, 'student', docSnapshot.id);
+          batch.update(facultyRef, {
+            numOnQueue: 0
+          });
+        });
+      }
+      
+      await batch.commit();
+      
+      Alert.alert('Success', `Cancelled ${waitingStudentsSnapshot.size} queues successfully and reset all faculty queue counts`);
+    } catch (error) {
+      console.error('Error cancelling all queues:', error);
+      Alert.alert('Error', 'Failed to cancel all queues');
+    }
+  };
+  
+  
+  
   const handleRequest = async () => {
     console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);
   
@@ -259,7 +396,7 @@ useEffect(() => {
         firestoreWhere('faculty', '==', selectedFaculty),
         firestoreWhere('status', '==', 'waiting')
       );
-      
+     
       const queueSnapshot = await getDocs(queueQuery);
       const queuePosition = queueSnapshot.size + 1;
   
@@ -285,6 +422,32 @@ useEffect(() => {
           queuePosition: queuePosition
         });
   
+        const facultyQuery = query(
+          collection(db, 'student'),
+          where('fullName', '==', selectedFaculty),
+          where('userType', '==', 'FACULTY')
+        );
+        
+        const facultySnapshot = await getDocs(facultyQuery);
+        if (!facultySnapshot.empty) {
+          const facultyDoc = facultySnapshot.docs[0];
+          const facultyData = facultyDoc.data();
+          
+          // If queue is empty, send notification to faculty
+          if (facultyData.numOnQueue === 0) {
+            // await sendNotificationToFaculty(facultyData.phoneNumber);
+            // await sendEmailNotification(
+            //   'template_jbfj8p6',
+            //   facultyData.email,
+            //   facultyData.fullName
+            // );
+          }
+          
+          await updateDoc(doc(db, 'student', facultyDoc.id), {
+            numOnQueue: increment(1)
+          });
+        }
+  
         setTicketNumber(newNumber);
         setIsRequested(true);
         Alert.alert('Success', `Queue position: ${queuePosition}`);
@@ -309,6 +472,20 @@ useEffect(() => {
         const studentData = studentDoc.data();
         console.log("Student data found:", studentData);
         
+        const facultyQuery = query(
+          collection(db, 'student'),
+          where('fullName', '==', selectedFaculty),
+          where('userType', '==', 'FACULTY')
+        );
+        
+        const facultySnapshot = await getDocs(facultyQuery);
+        if (!facultySnapshot.empty) {
+          const facultyDoc = facultySnapshot.docs[0];
+          
+          await updateDoc(doc(db, 'student', facultyDoc.id), {
+            numOnQueue: increment(-1)
+          });
+        }
         if (studentData.userType === 'STUDENT') {
           await updateDoc(studentRef, {
             status: 'cancelled',
@@ -386,7 +563,7 @@ useEffect(() => {
             const newState = [...prevState];
             const facultyIndex = newState.findIndex(f => f.faculty === faculty);
             if (facultyIndex >= 0) {
-              newState[facultyIndex].tickets = tickets; 
+              newState[facultyIndex].tickets = tickets;
             } else {
               newState.push({ faculty, tickets });
             }
@@ -403,47 +580,101 @@ useEffect(() => {
 
   const TicketOverview = () => (
     <View style={styles.overviewContainer}>
-     <View style={styles.DualContainer}>
-      <Text style={styles.overviewTitle}>All Faculty Queues</Text>
-      <TouchableOpacity 
-        style={styles.closeButton}
-        onPress={() => setShowTicketOverview(false)}
-      >
-        <Text style={styles.buttonText}>Close</Text>
-      </TouchableOpacity>
-
-     </View>
-     <View style={styles.tableSubHeader}>
-          <Text style={[styles.headerCell, { flex: 1 }]}>Ticket #</Text>
-          <Text style={[styles.headerCell, { flex: 1 }]}>Student</Text>
-        </View>
-     {allFacultyTickets.map((facultyData, index) => (
-     
-     <View key={index} style={styles.tableSection}>
-        <View style={styles.tableHeader}>
-          <Text style={styles.headerCell}>{facultyData.faculty}</Text>
-        </View>
-
-        {facultyData.tickets.map((ticket, ticketIndex) => (
-          <TouchableOpacity
-            key={ticketIndex}
-            style={styles.tableRow}
-            onPress={() => {
-              setSelectedStudent(ticket.studentName);
-              setShowTicketOverview(false);
-            }}
-          >
-            <Text style={[styles.tableCell, { flex: 1 }]}>
-              {`${ticket.program}-${String(ticket.ticketNumber).padStart(4, '0')}`}
-            </Text>
-            <Text style={[styles.tableCell, { flex: 1 }]}>{ticket.studentName}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.DualContainer}>
+        <Text style={styles.overviewTitle}>All Faculty Queues</Text>
+        <TouchableOpacity 
+          style={[styles.closeButton,{width: 100}]}
+          onPress={() => setShowTicketOverview(false)}
+        >
+          <Text style={styles.buttonText}>Close</Text>
+        </TouchableOpacity>
       </View>
-    ))}
       
+      <View style={styles.tableSubHeader}>
+        <Text style={[styles.headerCell, { flex: 1 }]}>Ticket #</Text>
+        <Text style={[styles.headerCell, { flex: 1 }]}>Student</Text>
+        
+      </View>
+      <View style={{ height: 2, backgroundColor: 'black' }} />
+      <ScrollView style={styles.scrollableContent}>
+        {allFacultyTickets
+        .filter(facultyData => facultyData.tickets.length > 0)
+        .map((facultyData, index) => (
+          <View key={index} style={styles.tableSection}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.headerCell}>{facultyData.faculty}</Text>
+            </View>
+  
+            {facultyData.tickets.map((ticket, ticketIndex) => (
+              <View key={ticketIndex} style={[styles.tableRow, { justifyContent: 'space-between' }]}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', flex: 1 }}
+                  onPress={() => {
+                    setSelectedStudent(ticket.studentName);
+                    setShowTicketOverview(false);
+                  }}
+                >
+                  <Text style={[styles.tableCell, { flex: 1 }]}>
+                    {`${ticket.program}-${String(ticket.ticketNumber).padStart(4, '0')}`}
+                  </Text>
+                  <Text style={[styles.tableCell, { flex: 1 }]}>{ticket.studentName}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={async () => {
+                    try {
+                      // Find the student document by name
+                      const studentsQuery = firestoreQuery(
+                        collection(db, 'student'),
+                        firestoreWhere('fullName', '==', ticket.studentName),
+                        firestoreWhere('userTicketNumber', '==', ticket.ticketNumber)
+                      );
+                      const facultyQuery = query(
+                        collection(db, 'student'),
+                        where('fullName', '==', selectedFaculty),
+                        where('userType', '==', 'FACULTY')
+                      );
+                      
+                      const facultySnapshot = await getDocs(facultyQuery);
+                      if (!facultySnapshot.empty) {
+                        const facultyDoc = facultySnapshot.docs[0];
+                        
+                        await updateDoc(doc(db, 'student', facultyDoc.id), {
+                          numOnQueue: increment(-1)
+                        });
+                      }
+                      const studentSnapshot = await getDocs(studentsQuery);
+                      if (!studentSnapshot.empty) {
+                        const studentDoc = studentSnapshot.docs[0];
+                        await updateDoc(doc(db, 'student', studentDoc.id), {
+                          status: 'cancelled',
+                          userTicketNumber: null,
+                          faculty: null,
+                          concern: null,
+                          otherConcern: null,
+                          requestDate: null,
+                          queuePosition: null
+                        });
+                        Alert.alert('Success', 'Queue cancelled successfully');
+                      } else {
+                        Alert.alert('Error', 'Could not find student');
+                      }
+                    } catch (error) {
+                      console.error('Error cancelling queue:', error);
+                      Alert.alert('Error', 'Failed to cancel the queue');
+                    }
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>X</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
+  
 
   return (
     <View style={styles.container}>
@@ -452,82 +683,97 @@ useEffect(() => {
         <TicketOverview />
       ) : (
         <>
-        <View style = {styles.DualContainer}>
-          <Text style={styles.title}>ADD QUEUE</Text>
-          <TouchableOpacity 
-            style={styles.overviewButton}
-            onPress={() => setShowTicketOverview(true)}
-          >
-            <Text style={styles.buttonText}>View All Tickets</Text>
-          </TouchableOpacity>
-         </View>
+         <View style={styles.headerContainer}>
+            <Text style={styles.title}>ADD QUEUE</Text>
+            <View style={styles.headerButtonsContainer}>
+              <TouchableOpacity 
+                style={styles.viewTicketsButton}
+                onPress={() => setShowTicketOverview(true)}
+              >
+                <Text style={styles.buttonText}>View All Tickets</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelAllButton}
+                onPress={handleCancelAllQueues}
+              >
+                <Text style={styles.buttonText}>Cancel All Queues</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
   
           {isCheckingRequest ? (
-            <ActivityIndicator size="large" color="#004000" />
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="large" color="#ffffff" />
+              <Text style={styles.loaderText}>Checking request status...</Text>
+            </View>
           ) : (
             isRequested ? (
-              <View style={[styles.ticketContainer, {
-                width: '100%',
-                backgroundColor: '#FFFFFF',  // Add white background
-                padding: 20,                 // Add some padding
-                borderRadius: 8,            // Optional: rounded corners       
-              }]}>
-                <View style={[styles.ticketContainer, {width: '100%'}]}>
-                  <Text style={[styles.subHeaderText, {fontWeight: 'bold'}]}>
-                    People in front of you: {peopleAhead}
+              <View style={styles.ticketContainerCard}>
+                <View style={styles.ticketHeader}>
+                  <Text style={styles.queuePositionText}>
+                    People in front of you: <Text style={styles.highlightText}>{peopleAhead}</Text>
                   </Text>
-                  <View style={styles.ticketDetails}>
-                    <Text style={[styles.ticketLabel, { color: '#d9ab0e', fontWeight: 'bold', fontSize: 22}]}>
-                      YOUR TICKET NUMBER
-                    </Text>
-                    <Text style={[styles.ticketNumber, { fontSize: 25, marginBottom: 20}]}>
-                      {`${userProgram}-${String(userTicketNumber).padStart(4, '0')}`}
-                    </Text>
-                    <View style={styles.ticketInfoContainer}>
-                      <View>
-                        <Text style={[styles.ticketLabel, { color: '#000000', fontWeight: 'bold', fontSize: 16 }]}>
-                          NEXT SERVING
-                        </Text>
-                        <Text style={[styles.ticketInfo, {fontSize: 20}]}>
-                          {nextDisplayedTicket 
-                            ? `${nextDisplayedProgram}-${String(nextDisplayedTicket).padStart(4, '0')}`
-                            : 'No Next Ticket'
-                          }
-                        </Text>
-                      </View>
-                      <View>
-                        <Text style={[styles.ticketLabel, { color: '#000000', fontWeight: 'bold', fontSize: 16 }]}>
-                          NOW SERVING
-                        </Text>
-                        <Text style={[styles.ticketInfo, {fontSize: 20}]}>
-                          {currentDisplayedTicket
-                            ? `${currentDisplayedProgram}-${String(currentDisplayedTicket).padStart(4, '0')}`
-                            : 'No ticket displayed'
-                          }
-                        </Text>
-                      </View>
+                </View>
+                <View style={styles.ticketDetails}>
+                  <Text style={styles.ticketLabelLarge}>
+                    YOUR TICKET NUMBER
+                  </Text>
+                  <Text style={styles.ticketNumber}>
+                    {`${userProgram}-${String(userTicketNumber).padStart(4, '0')}`}
+                  </Text>
+                  <View style={styles.statusContainer}>
+                    <View style={styles.statusBox}>
+                      <Text style={styles.statusLabel}>NEXT SERVING</Text>
+                      <Text style={styles.statusValue}>
+                        {nextDisplayedTicket 
+                          ? `${nextDisplayedProgram}-${String(nextDisplayedTicket).padStart(4, '0')}`
+                          : 'No Next Ticket'
+                        }
+                      </Text>
                     </View>
-                    <Text style={[styles.waitText, { marginTop: 30, marginBottom: -10, fontSize: 23}]}>
+                    <View style={styles.statusBox}>
+                      <Text style={styles.statusLabel}>NOW SERVING</Text>
+                      <Text style={styles.statusValue}>
+                        {currentDisplayedTicket
+                          ? `${currentDisplayedProgram}-${String(currentDisplayedTicket).padStart(4, '0')}`
+                          : 'No ticket displayed'
+                        }
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.turnIndicator}>
+                    <Text style={userTicketNumber === currentDisplayedTicket ? styles.yourTurnText : styles.waitText}>
                       {userTicketNumber === currentDisplayedTicket ? "YOUR TURN" : "PLEASE WAIT"}
                     </Text>
                   </View>
-                  <View style={styles.buttonContainer}>
-                    <Button title="CANCEL" onPress={handleCancelQueue} color="#c8c4c4" />
-                    <Button title="QUEUE AGAIN" onPress={AddMoreQueue} color="#004000" />
-                  </View>
+                </View>
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity 
+                    style={styles.cancelQueueButton} 
+                    onPress={handleCancelQueue}
+                  >
+                    <Text style={styles.buttonText}>CANCEL</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.queueAgainButton} 
+                    onPress={AddMoreQueue}
+                  >
+                    <Text style={styles.buttonText}>QUEUE AGAIN</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ) : (
               <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Student</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
                     selectedValue={selectedStudent}
                     onValueChange={(itemValue) => {
                       setSelectedStudent(itemValue);
                     }}
-                    style={[styles.picker, { color: '#ccc' }]}
+                    style={[styles.picker, { color: 'black' }]}
                   >
-                    <Picker.Item label="Select Student" value="" color="#fff" />
+                    <Picker.Item label="Select Student" value="" color="black" />
                     {studentsList
                       .sort((a, b) => a.fullName.localeCompare(b.fullName))
                       .map((student) => (
@@ -535,11 +781,13 @@ useEffect(() => {
                           key={student.id}
                           label={student.fullName}
                           value={student.id}
-                          color="#fff"
+                          color="black"
                         />
                       ))}
                   </Picker>
                 </View>
+                
+                <Text style={styles.formLabel}>Faculty</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
                     selectedValue={selectedFaculty}
@@ -559,6 +807,8 @@ useEffect(() => {
                       ))}
                   </Picker>
                 </View>
+                
+                <Text style={styles.formLabel}>Concern</Text>
                 <View style={styles.pickerContainer}>
                   <Picker
                     selectedValue={selectedConcern}
@@ -575,12 +825,19 @@ useEffect(() => {
                     )}
                   </Picker>
                 </View>
+                
                 <View style={styles.buttonsContainer}>
-                  <TouchableOpacity style={styles.requestButton} onPress={handleRequest}>
-                    <Text style={styles.buttonText}>Request</Text>
+                  <TouchableOpacity 
+                    style={styles.requestButton} 
+                    onPress={handleRequest}
+                  >
+                    <Text style={styles.buttonText}>ADD TO QUEUE</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
-                    <Text style={styles.buttonText}>Cancel</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton} 
+                    onPress={handleCancel}
+                  >
+                    <Text style={styles.buttonText}>CANCEL</Text>
                   </TouchableOpacity>   
                 </View>
               </View>
@@ -593,138 +850,220 @@ useEffect(() => {
 };
 
 const styles = StyleSheet.create({
+  // Add these styles to your existing stylesheet
+  cancelButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgb(50, 41, 41)',
+    padding: 5,
+    borderRadius: 5,
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   container: {
     flex: 1,
     backgroundColor: "#0d3310",
     padding: 20,
     borderRadius: 8,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-    textAlign: 'justify',
-    width: '100%',
-  },
-  ticketContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerText: {
-    fontSize: 35,
-    fontWeight: 'bold',
-    color: '#f3f3f3',
+  headerContainer: {
     marginBottom: 20,
   },
-  subHeaderText: {
-    color: '#555555',
+  headerButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
   },
-  ticketDetails: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  ticketLabel: {
-    color: '#f3f3f3',
-    fontSize: 14,
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#fff',
     marginBottom: 5,
   },
-  ticketNumber: {
-    color: 'black',
-    fontSize: 30,
+  viewTicketsButton: {
+    backgroundColor: '#1E8449',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  cancelAllButton: {
+    backgroundColor: 'rgb(61, 57, 57)',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: 'bold',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderText: {
+    color: 'black',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  formGroup: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 10,
+  },
+  formLabel: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  pickerContainer: {
+    backgroundColor: "#2e4f2e",
+    borderRadius: 5,
+    marginBottom: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: '#3e6f3e',
+  },
+  picker: {
+    color: "black",
+    width: "100%",
+    height: 50,
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 30,
+  },
+  requestButton: {
+    backgroundColor: '#1E8449',
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    flex: 1,
+    marginRight: 10,
+  },
+  closeButton: {
+    backgroundColor: 'rgb(45, 43, 43)',
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    flex: .2,
+  },
+  ticketContainerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  ticketHeader: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+    paddingBottom: 15,
     marginBottom: 15,
   },
-  ticketInfoContainer: {
+  queuePositionText: {
+    fontSize: 16,
+    color: '#555555',
+    fontWeight: '600',
+  },
+  highlightText: {
+    fontWeight: 'bold',
+    color: '#1E8449',
+  },
+  ticketDetails: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  ticketLabelLarge: {
+    color: '#d9ab0e',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  ticketNumber: {
+    color: '#333333',
+    fontSize: 30,
+    fontWeight: 'bold',
+    marginBottom: 30,
+  },
+  statusContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     marginVertical: 20,
   },
-  ticketInfo: {
-    color: 'black',
-    fontSize: 18,
+  statusBox: {
+    backgroundColor: '#F9F9F9',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    width: '48%',
+  },
+  statusLabel: {
+    color: '#555555',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  statusValue: {
+    color: '#333333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  turnIndicator: {
+    marginTop: 20,
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  yourTurnText: {
+    color: '#1E8449',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   waitText: {
-    color: '#004000',
-    fontSize: 16,
+    color: '#07643d',
+    fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 20,
   },
   buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 30,
-    width: '100%',
-    borderRadius: 5,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
   },
-  formGroup: {
+  cancelQueueButton: {
+    backgroundColor: '#808080',
+    borderRadius: 5,
+    paddingVertical: 12,
+    width: '48%',
+    alignItems: 'center',
+  },
+  queueAgainButton: {
+    backgroundColor: '#1E8449',
+    borderRadius: 5,
+    paddingVertical: 12,
+    width: '48%',
+    alignItems: 'center',
+  },
+  // Add these additional styles needed for TicketOverview
+  scrollableContent: {
     flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  pickerContainer: {
-    width: "100%",
-    height: 50,
-    backgroundColor: "#2e4f2e",
-    borderRadius: 5,
-    justifyContent: "center",
-    marginBottom: 15,
-    overflow: "hidden",
-  },
-  picker: {
-    borderColor: "#2e4f2e",
-    backgroundColor: "#2e4f2e",
-    color: "#fff",
-    width: "100%",
-    fontSize: 16,
-  },
-  input: {
-    backgroundColor: '#333',
-    color: '#fff',
-    padding: 10,
-    marginBottom: 20,
-    borderRadius: 5,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly', 
     width: '100%',
-    marginTop: 20,
-  },
-  DualContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly', 
-    width: '100%',
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  requestButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 5,
-    alignItems: 'center',
-    paddingVertical: 8,
-    width: '48%', // Adjust width if necessary
-  },
-  closeButton: {
-    backgroundColor: '#FF5C5C',
-    paddingVertical: 8,
-    borderRadius: 5,
-    width: '48%', // Adjust width if necessary
-    alignItems: 'center',
-  },
-  overviewButton : {
-    backgroundColor: 'green',
-    paddingVertical: 8,
-    borderRadius: 5,
-    width: '15%', 
-    alignItems: 'center',
+    maxHeight: '75%',
   },
   overviewContainer: {
     backgroundColor: '#fff',
@@ -735,60 +1074,51 @@ const styles = StyleSheet.create({
   overviewTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20
-  },
-  facultySection: {
-    marginBottom: 20
-  },
-  facultyName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10
-  },
-  ticketGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10
-  },
-  miniTicket: {
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 5
-  },
-  miniTicketText: {
-    fontSize: 14
+    marginBottom: 20,
+    color: '#333'
   },
   tableSection: {
     marginVertical: 10,
     width: '100%',
     backgroundColor: '#fff',
     borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
   tableHeader: {
-    backgroundColor: '#004000',
+    backgroundColor: '#1E8449',
     padding: 12,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
   },
   tableSubHeader: {
     flexDirection: 'row',
-    backgroundColor: 'black',
     padding: 10,
   },
   headerCell: {
-    color: '#fff',
+    color: 'black',
     fontWeight: 'bold',
     fontSize: 16,
   },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderColor: '#ddd',
-    padding: 10,
+    borderColor: '#EEEEEE',
+    padding: 12,
+    alignItems: 'center',
   },
   tableCell: {
     fontSize: 14,
-  }
+    color: '#333',
+  },
+  DualContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
 });
 
 export default AddQueue;

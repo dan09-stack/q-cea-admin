@@ -36,6 +36,7 @@ const Index = () => {
       source={require('../assets/images/green.jpg')}  
       style={styles.container}
     >
+      
       <View style={styles.loginBox}>
         <Text style={styles.title}>Admin Login</Text>
         <TextInput
@@ -80,7 +81,7 @@ const Index = () => {
         </TouchableOpacity>
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         <TouchableOpacity>
-          <Text style={styles.forgotPassword}>Forgot your password?</Text>
+          {/* <Text style={styles.forgotPassword}>Forgot your password?</Text> */}
         </TouchableOpacity>
       </View>
     </ImageBackground>
@@ -95,7 +96,6 @@ const styles = StyleSheet.create({
   },
   loginBox: {
     width: "25%",
-    height: "30%",
     backgroundColor: '#000',
     padding: 20,
     borderRadius: 10,

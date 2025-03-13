@@ -45,11 +45,13 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
   };
 
   const programs = [
-    { label: "Select Program", value: "" },
-    { label: "Bachelor of Science in Civil Engineering", value: "BSCE" },
-    { label: "Bachelor of Science in Computer Engineering", value: "BSCpE" },
-    { label: "Bachelor of Science in Electrical Engineering", value: "BSEE" },
-    { label: "Bachelor of Science in Mechanical Engineering", value: "BSME" },
+    { label: "Select Program", value: "" }, 
+    { label: "B.S. Architecture", value: "ARCH" },
+    { label: "B.S. Civil Engineering", value: "CE" },
+    { label: "B.S. Computer Engineering", value: "CPE" },
+    { label: "B.S. Electrical Engineering", value: "EE" },
+    { label: "B.S. Electronics Engineering", value: "ECE" },
+    { label: "B.S. Mechanical Engineering", value: "ME" }
   ];
 
   const validateForm = () => {
@@ -103,7 +105,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
           phoneNumber: formData.phoneNumber,
           program: formData.program,
           email: formData.email,
-          userType: 'student'
+          userType: 'STUDENT'
         });
         await sendEmailVerification(user);
   

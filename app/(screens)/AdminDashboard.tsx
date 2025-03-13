@@ -9,6 +9,7 @@ import AddQueue from "@/components/AddQueue";
 import AddAdmin from "@/components/VerifyFaculty";
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
+import { LinearGradient } from 'expo-linear-gradient';
 import AddAdminScreen from "@/components/VerifyFaculty";
 
 const AdminDashboard: React.FC = () => {
@@ -32,7 +33,10 @@ const AdminDashboard: React.FC = () => {
           }}
         />
       </View>
-      <View style={styles.content}>
+      <LinearGradient
+        colors={['#4CAF50', '#2E7D32', '#1B5E20']}
+        style={styles.content}
+      >
         {currentView === 'addFaculty' ? (
           <View style={styles.facultyContainer}>
             <AddFaculty onClose={() => setCurrentView('faculty')} />
@@ -95,7 +99,7 @@ const AdminDashboard: React.FC = () => {
           
         )
         }
-      </View>
+      </LinearGradient>
     </View>
   );
 };
@@ -110,11 +114,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#333",
   },
   content: { 
-    flex: .92, 
-    backgroundColor: "#4CAF50" 
+    flex: .92,
+    // Remove the backgroundColor property as it's now handled by LinearGradient
   },
   FacultyList: { 
-    flex: 1 ,
+    flex: 1,
     width: "100%"
   },
   facultyContainer: { 
