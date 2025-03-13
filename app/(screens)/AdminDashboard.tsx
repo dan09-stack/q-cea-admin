@@ -15,6 +15,7 @@ import AddAdminScreen from "@/components/VerifyFaculty";
 const AdminDashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState('faculty'); // Default view is 'faculty'
   const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [showTicketOverview, setShowTicketOverview] = useState(false);
   return (
     <View style={styles.container}>
       
@@ -46,6 +47,10 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewTickets={() => {
+                setCurrentView('addQueue');
+                setShowTicketOverview(true);
+              }}
             />
           </View>
         ) : currentView === 'addStudent' ? (
@@ -57,6 +62,10 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewTickets={() => {
+                setCurrentView('addQueue');
+                setShowTicketOverview(true);
+              }}
             />
           </View>
         ) : currentView === 'verifyFaculty' ? (
@@ -68,17 +77,28 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewTickets={() => {
+                setCurrentView('addQueue');
+                setShowTicketOverview(true);
+              }}
             />
           </View>
         ) : currentView === 'addQueue' ? (
           <View style={styles.facultyContainer}>
-            <AddQueue onClose={() => setCurrentView('faculty')} />
+            <AddQueue onClose={() => setCurrentView('faculty')} 
+                showTicketOverview={showTicketOverview}
+                setShowTicketOverview={setShowTicketOverview}
+                />
             <QueueInfo
               onAddFaculty={() => setCurrentView('addFaculty')}
               onAddStudent={() => setCurrentView('addStudent')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
+              onViewTickets={() => {
+                setCurrentView('addQueue');
+                setShowTicketOverview(true);
+              }}
             />
           </View>
         ) : currentView === 'profile' ? (
@@ -94,10 +114,13 @@ const AdminDashboard: React.FC = () => {
               onVerifyFaculty={() => setCurrentView('verifyFaculty')}
               onAddQueue={() => setCurrentView('addQueue')}
               onViewRatings={() => alert('Faculty Ratings')}
+              onViewTickets={() => {
+                setCurrentView('addQueue');
+                setShowTicketOverview(true);
+              }}
             />
           </View>
-          
-        )
+        )   
         }
       </LinearGradient>
     </View>
