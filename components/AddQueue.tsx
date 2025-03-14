@@ -15,10 +15,20 @@ import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 import { useAppTheme } from "@/utils/theme";
 
-const AddQueue: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+interface AddQueueProps {
+  onClose: () => void;
+  showTicketOverview: boolean;
+  setShowTicketOverview: React.Dispatch<React.SetStateAction<boolean>>;
+} 
+
+  const AddQueue: React.FC<AddQueueProps> = ({ 
+    onClose, 
+    showTicketOverview, 
+    setShowTicketOverview 
+  }) => {
   const [showPriorityModal, setShowPriorityModal] = useState(false);
-const [priorityName, setPriorityName] = useState('');
-const [priorityId, setPriorityId] = useState('');
+  const [priorityName, setPriorityName] = useState('');
+  const [priorityId, setPriorityId] = useState('');
   const [selectedFaculty, setSelectedFaculty] = useState('');
   const [selectedConcern, setSelectedConcern] = useState('');
   const [otherConcern, setOtherConcern] = useState('');
@@ -38,7 +48,7 @@ const [priorityId, setPriorityId] = useState('');
   const [currentDisplayedProgram, setCurrentDisplayedProgram] = useState('');
   const [userProgram, setUserProgram] = useState('');
   // ticket overview list
-  const [showTicketOverview, setShowTicketOverview] = useState(false);
+
   const [allFacultyTickets, setAllFacultyTickets] = useState<Array<{
     faculty: string,
     tickets: Array<{
@@ -694,8 +704,8 @@ useEffect(() => {
       ) : (
         <>
          <View style={styles.headerContainer}>
-            <Text style={getTextStyle(styles.title, true)}>ADD QUEUE</Text>
-            <View style={styles.headerButtonsContainer}>
+         <Text style={getTextStyle(styles.title, true)}>ADD QUEUE</Text>
+            {/* <View style={styles.headerButtonsContainer}>
               <TouchableOpacity 
                 style={getButtonStyle(styles.viewTicketsButton)}
                 onPress={() => setShowTicketOverview(true)}
@@ -708,7 +718,8 @@ useEffect(() => {
               >
                 <Text style={styles.buttonText}>Cancel All Queues</Text>
               </TouchableOpacity>
-            </View>
+            </View> */}
+
           </View>
   
           {isCheckingRequest ? (
