@@ -25,9 +25,6 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
 }) => {
   const [queueCount, setQueueCount] = useState<number>(0); // State to store queue count
   const [unverifiedCount, setUnverifiedCount] = useState<number>(0);
-  const [showTicketOverview, setShowTicketOverview] = useState(false);
-
-
 
   // Add the cancel all queues function
   const handleCancelAllQueues = async () => {
@@ -111,7 +108,23 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
             <Text style={styles.queueTitle}>TOTAL</Text>
             <Text style={styles.queueTitle}>STUDENT ON QUEUE</Text>
             <Text style={styles.queueCount}>{queueCount}</Text> {/* Display the queueCount */}
+
+            <View style={styles.headerButtonsContainer}>
+              <TouchableOpacity
+                style={styles.viewTicketsButton}
+                onPress={onViewTickets}
+              >
+                <Text style={styles.buttonText}>View All Tickets</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelAllButton}
+                onPress={handleCancelAllQueues}
+              >
+                <Text style={styles.buttonText}>Cancel All Queues</Text>
+              </TouchableOpacity>
           </View>
+        </View>
+
 
           {/* Action Buttons */}
           <TouchableOpacity onPress={onAddFaculty}>
@@ -123,20 +136,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
           <TouchableOpacity onPress={onAddQueue}>
             <Text style={styles.button}>Queue</Text>
           </TouchableOpacity>
-          <View style={styles.headerButtonsContainer}>
-            <TouchableOpacity
-              style={styles.viewTicketsButton}
-              onPress={onViewTickets}
-            >
-              <Text style={styles.buttonText}>View All Tickets</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelAllButton}
-              onPress={handleCancelAllQueues}
-            >
-              <Text style={styles.buttonText}>Cancel All Queues</Text>
-            </TouchableOpacity>
-          </View>
+
         </View>
       )}
     
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   cancelAllButton: {
-    backgroundColor: 'rgb(61, 57, 57)',
+    backgroundColor: 'rgb(173, 51, 51)',
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 5,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   closeButton: {
-    backgroundColor: 'rgb(45, 43, 43)',
+    backgroundColor: 'rgb(50, 41, 41)',
     borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',

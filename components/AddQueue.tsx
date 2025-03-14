@@ -696,20 +696,6 @@ useEffect(() => {
         <>
          <View style={styles.headerContainer}>
             <Text style={styles.title}>ADD QUEUE</Text>
-            <View style={styles.headerButtonsContainer}>
-              <TouchableOpacity 
-                style={styles.viewTicketsButton}
-                onPress={() => setShowTicketOverview(true)}
-              >
-                <Text style={styles.buttonText}>View All Tickets</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.cancelAllButton}
-                onPress={handleCancelAllQueues}
-              >
-                <Text style={styles.buttonText}>Cancel All Queues</Text>
-              </TouchableOpacity>
-            </View>
           </View>
   
           {isCheckingRequest ? (
