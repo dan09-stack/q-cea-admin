@@ -13,6 +13,7 @@ import { db, auth } from "../firebaseConfig";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
 import { useAppTheme } from '../utils/theme';
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 interface AddFacultyProps {
   onClose: () => void;
@@ -71,7 +72,6 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     { label: "Program Head-Electrical Engineering", value: "PH-EE" },
     { label: "Program Head-Electronics Engineering", value: "PH-ECE" },
     { label: "Program Head-Mechanical Engineering", value: "PH-ME" },
-    { label: "Dean", value: "DEAN" },
   ];
 
   const validateForm = () => {
@@ -80,13 +80,81 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
       showAlert("Error", "Please fill in all fields");
       return false;
     }
+    
+    // Phone number format validation
+    // Check for Philippine phone number format (e.g., 09XXXXXXXXX)
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    if (!phoneRegex.test(formData.phoneNumber)) {
+      showAlert("Error", "Please enter a valid Philippine phone number (e.g., 09XXXXXXXXX or +639XXXXXXXXX)");
+      return false;
+    }
+    
     return true;
+  };
+
+  const checkExistingFaculty = async () => {
+    try {
+      const studentCollection = collection(db, 'student');
+      
+      // Check for duplicate full name
+      const nameQuery = query(studentCollection, where('fullName', '==', formData.fullName));
+      const nameSnapshot = await getDocs(nameQuery);
+      if (!nameSnapshot.empty) {
+        showAlert("Error", "A faculty member with this name already exists");
+        return true;
+      }
+      
+      // Check for duplicate ID number
+      const idQuery = query(studentCollection, where('idNumber', '==', formData.idNumber));
+      const idSnapshot = await getDocs(idQuery);
+      if (!idSnapshot.empty) {
+        showAlert("Error", "A faculty member with this ID number already exists");
+        return true;
+      }
+      
+      // Check for duplicate RFID UID
+      const rfidQuery = query(studentCollection, where('rfid_uid', '==', formData.rfid_uid));
+      const rfidSnapshot = await getDocs(rfidQuery);
+      if (!rfidSnapshot.empty) {
+        showAlert("Error", "A faculty member with this RFID UID already exists");
+        return true;
+      }
+      
+      // Check for duplicate phone number
+      const phoneQuery = query(studentCollection, where('phoneNumber', '==', formData.phoneNumber));
+      const phoneSnapshot = await getDocs(phoneQuery);
+      if (!phoneSnapshot.empty) {
+        showAlert("Error", "A faculty member with this phone number already exists");
+        return true;
+      }
+      
+      // Check for duplicate email
+      const emailQuery = query(studentCollection, where('email', '==', formData.email));
+      const emailSnapshot = await getDocs(emailQuery);
+      if (!emailSnapshot.empty) {
+        showAlert("Error", "A faculty member with this email already exists");
+        return true;
+      }
+      
+      return false; // No duplicates found
+    } catch (error) {
+      console.error("Error checking for existing faculty:", error);
+      showAlert("Error", "Failed to check for existing faculty members");
+      return true; // Treat as duplicate to prevent registration
+    }
   };
 
   const handleAdd = async () => {
     if (validateForm()) {
       setIsLoading(true);
       try {
+        // Check for existing faculty with same details
+        const duplicateExists = await checkExistingFaculty();
+        if (duplicateExists) {
+          setIsLoading(false);
+          return;
+        }
+        
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const user = userCredential.user;
 

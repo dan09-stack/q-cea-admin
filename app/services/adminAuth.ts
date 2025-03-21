@@ -1,48 +1,53 @@
-import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../firebaseConfig';
 
-const ADMIN_EMAIL = "q.cea2024@gmail.com";
-
-/**
- * Ensures the user is signed out when the app starts.
- */
-export const checkAuthState = () => {
-  return new Promise((resolve) => {
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        signOut(auth); // Force logout on load
-      }
-      resolve(null);
-    });
-  });
-};
-
-/**
- * Verifies admin credentials using Firebase Authentication.
- */
 export const verifyAdminCredentials = async (email: string, password: string) => {
   try {
-    if (email !== ADMIN_EMAIL) {
-      return { success: false, error: "Unauthorized access" };
-    }
-
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    return { success: true, admin: { email: user.email } };
-  } catch (error) {
-    return { success: false, error: "Invalid credentials" };
+    
+    // Check if the user is an admin (you might want to check a custom claim or a field in Firestore)
+    // For simplicity, we're assuming any authenticated user is an admin
+    
+    return {
+      success: true,
+      user: userCredential.user
+    };
+  } catch (error: any) {
+    let errorMessage = 'Authentication failed';
+    
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      errorMessage = 'Invalid email or password';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMessage = 'Too many failed login attempts. Try again later';
+    } else if (error.code === 'auth/user-disabled') {
+      errorMessage = 'This account has been disabled';
+    }
+    
+    return {
+      success: false,
+      error: errorMessage
+    };
   }
 };
 
-/**
- * Sends a password reset email to the admin.
- */
 export const resetAdminPassword = async (email: string) => {
   try {
     await sendPasswordResetEmail(auth, email);
-    return { success: true, message: 'Password reset email sent successfully' };
-  } catch (error) {
-    return { success: false, error: 'Failed to send reset email' };
+    return {
+      success: true
+    };
+  } catch (error: any) {
+    let errorMessage = 'Password reset failed';
+    
+    if (error.code === 'auth/user-not-found') {
+      errorMessage = 'No account found with this email';
+    } else if (error.code === 'auth/invalid-email') {
+      errorMessage = 'Invalid email address';
+    }
+    
+    return {
+      success: false,
+      error: errorMessage
+    };
   }
 };

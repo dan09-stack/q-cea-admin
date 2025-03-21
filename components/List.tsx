@@ -19,7 +19,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 interface UserItem {
   id: string;
-  email: string;
+  email: string;  
   fullName: string;
   userType: string;
   rfid_uid: string;
@@ -29,6 +29,7 @@ interface UserItem {
   phoneNumber: string;
   idNumber: string;
   userTicketNumber: string;
+  archived?: boolean;
 }
 
 const List: React.FC = () => {
@@ -37,6 +38,7 @@ const List: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL');
+  const [showArchived, setShowArchived] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -50,7 +52,7 @@ const List: React.FC = () => {
 
   // User types list for dropdown
   const userTypes = [
-    "STUDENT", "FACULTY", "ADMIN"
+    "STUDENT", "FACULTY", 
   ];
 
   // Status options
@@ -86,6 +88,7 @@ const List: React.FC = () => {
           phoneNumber: data.phoneNumber || '',
           idNumber: data.idNumber || '',
           userTicketNumber: data.userTicketNumber || '',
+          archived: data.archived || false,
         });
       });
       
@@ -100,6 +103,9 @@ const List: React.FC = () => {
   // Handle search and filter
   useEffect(() => {
     let result = users;
+    
+    // Filter by archived status
+    result = result.filter(user => user.archived === showArchived);
     
     // Filter by type if not "ALL"
     if (filterType !== 'ALL') {
@@ -117,7 +123,7 @@ const List: React.FC = () => {
     }
     
     setFilteredUsers(result);
-  }, [searchQuery, filterType, users]);
+  }, [searchQuery, filterType, users, showArchived]);
 
   // Handle edit button press
   const handleEdit = (user: UserItem) => {
@@ -130,6 +136,20 @@ const List: React.FC = () => {
   const handleDelete = (user: UserItem) => {
     setSelectedUser(user);
     setDeleteModalVisible(true);
+  };
+
+  // Handle archive button press
+  const handleArchive = async (user: UserItem) => {
+    try {
+      const userRef = doc(db, 'student', user.id);
+      await updateDoc(userRef, {
+        archived: !user.archived
+      });
+      showAlert('Success', `User ${user.archived ? 'unarchived' : 'archived'} successfully!`);
+    } catch (error) {
+      console.error('Error archiving/unarchiving user:', error);
+      showAlert('Error', 'Failed to update user. Please try again.');
+    }
   };
 
   // Confirm delete
@@ -146,11 +166,68 @@ const List: React.FC = () => {
     }
   };
 
-  // Save edited user
+  // Save edited user with duplicate checking
   const saveUser = async () => {
     if (!selectedUser || !formData) return;
-    
+    if (!formData.fullName || !formData.idNumber || !formData.phoneNumber) {
+      showAlert('Error', 'Full Name, ID Number, and Phone Number are required fields.');
+      return;
+    }
     try {
+      // Check if any fields have changed that need duplicate checking
+      const fieldsToCheck = [];
+      if (formData.fullName !== selectedUser.fullName) fieldsToCheck.push('fullName');
+      if (formData.idNumber !== selectedUser.idNumber) fieldsToCheck.push('idNumber');
+      if (formData.phoneNumber !== selectedUser.phoneNumber) fieldsToCheck.push('phoneNumber');
+      
+      // If any of these fields changed, check for duplicates
+      if (fieldsToCheck.length > 0) {
+        setIsLoading(true);
+        
+        // Create queries for each field that needs checking
+        const duplicateChecks = fieldsToCheck.map(async (field) => {
+          const fieldValue = formData[field as keyof typeof formData];
+          if (!fieldValue) return null;
+          
+          const fieldQuery = query(
+            collection(db, 'student'),
+            where(field, '==', fieldValue),
+          );
+          
+          const querySnapshot = await getDocs(fieldQuery);
+          
+          // Check if any document exists with this value (excluding the current user)
+          const duplicates = querySnapshot.docs.filter(doc => doc.id !== selectedUser.id);
+          
+          if (duplicates.length > 0) {
+            return { field, value: fieldValue };
+          }
+          return null;
+        });
+        
+        // Wait for all duplicate checks to complete
+        const results = await Promise.all(duplicateChecks);
+        const foundDuplicates = results.filter(result => result !== null);
+        
+        if (foundDuplicates.length > 0) {
+          const fieldNameMap = {
+            'fullName': 'Full Name',
+            'idNumber': 'ID Number',
+            'phoneNumber': 'Phone Number',
+            'email': 'Email'
+          };
+          
+          const duplicateFieldNames = foundDuplicates
+            .map(d => fieldNameMap[d?.field as keyof typeof fieldNameMap] || d?.field)
+            .join(', ');
+            
+          showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFieldNames}. Please use different values.`);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // If no duplicates found, proceed with the update
       const userRef = doc(db, 'student', selectedUser.id);
       await updateDoc(userRef, {
         email: formData.email,
@@ -162,7 +239,8 @@ const List: React.FC = () => {
         numOnQueue: formData.numOnQueue || 0,
         phoneNumber: formData.phoneNumber,
         idNumber: formData.idNumber,
-        userTicketNumber: formData.userTicketNumber
+        userTicketNumber: formData.userTicketNumber,
+        archived: formData.archived
       });
       
       showAlert('Success', 'User updated successfully!');
@@ -170,10 +248,12 @@ const List: React.FC = () => {
     } catch (error) {
       console.error('Error updating user:', error);
       showAlert('Error', 'Failed to update user. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Create new user
+  // Create new user with duplicate checking
   const createUser = async () => {
     if (!formData.email || !formData.fullName || !formData.userType) {
       showAlert('Error', 'Email, Name and User Type are required');
@@ -181,6 +261,43 @@ const List: React.FC = () => {
     }
     
     try {
+      setIsLoading(true);
+      
+      // Fields to check for duplicates
+      const fieldsToCheck = ['email', 'fullName', 'idNumber', 'phoneNumber'].filter(
+        field => formData[field as keyof typeof formData]
+      );
+      
+      // Create queries for each field that needs checking
+      const duplicateChecks = fieldsToCheck.map(async (field) => {
+        const fieldValue = formData[field as keyof typeof formData];
+        if (!fieldValue) return null;
+        
+        const fieldQuery = query(
+          collection(db, 'student'),
+          where(field, '==', fieldValue),
+        );
+        
+        const querySnapshot = await getDocs(fieldQuery);
+        
+        if (!querySnapshot.empty) {
+          return { field, value: fieldValue };
+        }
+        return null;
+      });
+      
+      // Wait for all duplicate checks to complete
+      const results = await Promise.all(duplicateChecks);
+      const foundDuplicates = results.filter(result => result !== null);
+      
+      if (foundDuplicates.length > 0) {
+        const duplicateFields = foundDuplicates.map(d => d?.field).join(', ');
+        showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFields}. Please use different values.`);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If no duplicates found, proceed with creating the user
       await addDoc(collection(db, 'student'), {
         email: formData.email,
         fullName: formData.fullName,
@@ -193,7 +310,8 @@ const List: React.FC = () => {
         idNumber: formData.idNumber || '',
         isVerified: true,
         createdAt: new Date(),
-        userTicketNumber: formData.userTicketNumber || ''
+        userTicketNumber: formData.userTicketNumber || '',
+        archived: false
       });
       
       showAlert('Success', 'User created successfully!');
@@ -202,11 +320,13 @@ const List: React.FC = () => {
     } catch (error) {
       console.error('Error creating user:', error);
       showAlert('Error', 'Failed to create user. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Handle input change
-  const handleInputChange = (field: string, value: string | number) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -218,7 +338,8 @@ const List: React.FC = () => {
     setFormData({
       status: 'OFFLINE',
       numOnQueue: 0,
-      userType: 'STUDENT'
+      userType: 'STUDENT',
+      archived: false
     });
     setCreateModalVisible(true);
   };
@@ -244,9 +365,15 @@ const List: React.FC = () => {
         <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editButton}>
           <Icon name="create-outline" size={24} color="#fff" />
         </TouchableOpacity>
-        {/* <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteButton}>
+        <TouchableOpacity 
+          onPress={() => handleArchive(item)} 
+          style={styles.archiveButton}
+        >
+          <Icon name={item.archived ? "refresh-outline" : "archive-outline"} size={24} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteButton}>
           <Icon name="trash-outline" size={24} color="#fff" />
-        </TouchableOpacity> */}
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -282,8 +409,16 @@ const List: React.FC = () => {
             >
               <Text style={[styles.filterText, filterType === 'FACULTY' && styles.activeFilterText]}>Faculty</Text>
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterButton, showArchived && styles.activeFilter]} 
+              onPress={() => setShowArchived(!showArchived)}
+            >
+              <Text style={[styles.filterText, showArchived && styles.activeFilterText]}>
+                {showArchived ? 'Archived' : 'Active'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          
+        
         </View>
       </View>
 
@@ -317,32 +452,23 @@ const List: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Edit User</Text>
             <ScrollView style={styles.formContainer}>
-              <Text style={styles.inputLabel}>Full Name</Text>
+            <Text style={styles.inputLabel}>Full Name <Text style={styles.requiredField}>*</Text></Text>
               <TextInput
                 style={styles.input}
                 value={formData.fullName}
                 onChangeText={(text) => handleInputChange('fullName', text)}
                 placeholder="Full Name"
               />
-              
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.email}
-                onChangeText={(text) => handleInputChange('email', text)}
-                placeholder="Email"
-                keyboardType="email-address"
-              />
-              
-              <Text style={styles.inputLabel}>ID Number</Text>
+
+              <Text style={styles.inputLabel}>ID Number <Text style={styles.requiredField}>*</Text></Text>
               <TextInput
                 style={styles.input}
                 value={formData.idNumber}
                 onChangeText={(text) => handleInputChange('idNumber', text)}
                 placeholder="ID Number"
               />
-              
-              <Text style={styles.inputLabel}>Phone Number</Text>
+
+              <Text style={styles.inputLabel}>Phone Number <Text style={styles.requiredField}>*</Text></Text>
               <TextInput
                 style={styles.input}
                 value={formData.phoneNumber}
@@ -350,30 +476,34 @@ const List: React.FC = () => {
                 placeholder="Phone Number"
                 keyboardType="phone-pad"
               />
-              
-              <Text style={styles.inputLabel}>RFID UID</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.rfid_uid}
-                onChangeText={(text) => handleInputChange('rfid_uid', text)}
-                placeholder="RFID UID"
-              />
-              
-              <Text style={styles.inputLabel}>User Type</Text>
-              <View style={styles.pickerContainer}>
-                {userTypes.map(type => (
-                  <TouchableOpacity 
-                    key={type}
-                    style={[
-                      styles.pickerItem, 
-                      formData.userType === type && styles.selectedPickerItem
-                    ]}
-                    onPress={() => handleInputChange('userType', type)}
-                  >
-                    <Text style={styles.pickerText}>{type}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+
+              {formData.userType !== 'STUDENT' && (
+                <>
+                  <Text style={styles.inputLabel}>RFID UID</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.rfid_uid}
+                    onChangeText={(text) => handleInputChange('rfid_uid', text)}
+                    placeholder="RFID UID"
+                  />
+                  
+                  <Text style={styles.inputLabel}>Status</Text>
+                  <View style={styles.pickerContainer}>
+                    {statusOptions.map(status => (
+                      <TouchableOpacity 
+                        key={status}
+                        style={[
+                          styles.pickerItem, 
+                          formData.status === status && styles.selectedPickerItem
+                        ]}
+                        onPress={() => handleInputChange('status', status)}
+                      >
+                        <Text style={styles.pickerText}>{status}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
               
               <Text style={styles.inputLabel}>Program</Text>
               <View style={styles.pickerContainer}>
@@ -391,40 +521,24 @@ const List: React.FC = () => {
                 ))}
               </View>
               
-              <Text style={styles.inputLabel}>Status</Text>
-              <View style={styles.pickerContainer}>
-                {statusOptions.map(status => (
-                  <TouchableOpacity 
-                    key={status}
-                    style={[
-                      styles.pickerItem, 
-                      formData.status === status && styles.selectedPickerItem
-                    ]}
-                    onPress={() => handleInputChange('status', status)}
-                  >
-                    <Text style={styles.pickerText}>{status}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <Text style={styles.inputLabel}>Queue Count</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.numOnQueue?.toString()}
-                onChangeText={(text) => handleInputChange('numOnQueue', parseInt(text) || 0)}
-                placeholder="Queue Count"
-                keyboardType="numeric"
-              />
+      
             </ScrollView>
             
             <View style={styles.modalButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveButton} onPress={saveUser}>
                 <Text style={styles.buttonText}>Save</Text>
               </TouchableOpacity>
             </View>
+            
+            {isLoading && (
+              <View style={styles.modalLoadingOverlay}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>Checking for duplicates...</Text>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -441,6 +555,9 @@ const List: React.FC = () => {
             <Text style={styles.modalTitle}>Confirm Delete</Text>
             <Text style={styles.confirmText}>
               Are you sure you want to delete user {selectedUser?.fullName}?
+            </Text>
+            <Text style={styles.warningText}>
+              This action cannot be undone. Consider archiving the user instead.
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteModalVisible(false)}>
@@ -489,7 +606,6 @@ const List: React.FC = () => {
                 onChangeText={(text) => handleInputChange('idNumber', text)}
                 placeholder="ID Number"
               />
-              
               <Text style={styles.inputLabel}>Phone Number</Text>
               <TextInput
                 style={styles.input}
@@ -573,6 +689,13 @@ const List: React.FC = () => {
                 <Text style={styles.buttonText}>Create</Text>
               </TouchableOpacity>
             </View>
+            
+            {isLoading && (
+              <View style={styles.modalLoadingOverlay}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>Checking for duplicates...</Text>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -581,6 +704,10 @@ const List: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  requiredField: {
+    color: 'red',
+    fontWeight: 'bold',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
@@ -689,6 +816,13 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#2196F3',
+    borderRadius: 5,
+    padding: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  archiveButton: {
+    backgroundColor: '#FF9800',
     borderRadius: 5,
     padding: 8,
     alignItems: 'center',
@@ -817,7 +951,23 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 16,
   },
+  warningText: {
+    fontSize: 14,
+    color: '#F44336',
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  modalLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
 });
 
 export default List;
-

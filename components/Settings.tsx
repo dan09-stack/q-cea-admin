@@ -383,27 +383,7 @@ const Settings: React.FC = () => {
           </TouchableOpacity>
         </View>
         
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Queue Management</Text>
-          
-          <Text style={styles.infoText}>
-            Use the button below to manually cancel all active queues and set faculty to offline.
-          </Text>
-          
-          <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={handleCancelAllQueues}
-          >
-            <Text style={styles.cancelButtonText}>Cancel All Queues</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.button, styles.testButton]}
-            onPress={checkAndCancelAfterHoursQueues}
-          >
-            <Text style={styles.buttonText}>Test After Hours Cancellation</Text>
-          </TouchableOpacity>
-        </View>
+     
       </ScrollView>
     </LinearGradient>
   );

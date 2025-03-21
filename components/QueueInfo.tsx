@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
 import firebase, { db } from "@/firebaseConfig"; // Import Firebase config
 import { collection, getDocs, query, where, updateDoc, doc, increment, writeBatch, orderBy, onSnapshot } from "firebase/firestore";
+import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 
 interface QueueInfoProps {
   onAddFaculty: () => void;
@@ -29,57 +30,69 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
   const [unverifiedCount, setUnverifiedCount] = useState<number>(0);
 
   // Add the cancel all queues function
-  const handleCancelAllQueues = async () => {
-    try {
-      const studentsCollectionRef = collection(db, 'student');
-      const waitingStudentsQuery = query(
-        studentsCollectionRef,
-        where('status', '==', 'waiting')
-      );
-
-      const waitingStudentsSnapshot = await getDocs(waitingStudentsQuery);
-
-      const facultyQuery = query(
-        studentsCollectionRef,
-        where('userType', '==', 'FACULTY')
-      );
-
-      const facultySnapshot = await getDocs(facultyQuery);
-
-      const batch = writeBatch(db);
-
-      if (!waitingStudentsSnapshot.empty) {
-        waitingStudentsSnapshot.docs.forEach((docSnapshot) => {
-          const studentRef = doc(db, 'student', docSnapshot.id);
-          batch.update(studentRef, {
-            status: 'completed',
-            userTicketNumber: null,
-            faculty: null,
-            concern: null,
-            otherConcern: null,
-            requestDate: null,
-            queuePosition: null
-          });
+ const handleCancelAllQueues = async () => {
+     try {
+       // Confirm cancellation first
+       // if (!confirm('Are you sure you want to cancel ALL queues? This action cannot be undone.')) {
+       //   return;
+       // }
+       
+       // Get all waiting students in queues
+       const studentsCollectionRef = collection(db, 'student');
+       const waitingStudentsQuery = firestoreQuery(
+         studentsCollectionRef, 
+         firestoreWhere('status', '==', 'waiting')
+       );
+       
+       const waitingStudentsSnapshot = await getDocs(waitingStudentsQuery);
+       
+       // Get all faculty users
+       const facultyQuery = firestoreQuery(
+         studentsCollectionRef,
+         firestoreWhere('userType', '==', 'FACULTY')
+       );
+       
+       const facultySnapshot = await getDocs(facultyQuery);
+       
+       // Batch update to cancel all queues and reset faculty queue counts
+       const batch = writeBatch(db);
+       
+       // Update all waiting students
+       if (!waitingStudentsSnapshot.empty) {
+         waitingStudentsSnapshot.docs.forEach((docSnapshot) => {
+           const studentRef = doc(db, 'student', docSnapshot.id);
+           batch.update(studentRef, {
+             status: 'completed',
+             userTicketNumber: null,
+             
+             faculty: null,
+             concern: null,
+             otherConcern: null,
+             requestDate: null,
+             queuePosition: null
+           });
+         });
+       }
+       
+       // Update all faculty members to reset numOnQueue
+       if (!facultySnapshot.empty) {
+         facultySnapshot.docs.forEach((docSnapshot) => {
+           const facultyRef = doc(db, 'student', docSnapshot.id);
+           batch.update(facultyRef, {
+             numOnQueue: 0,
+             displayedTicket:null
         });
-      }
-
-      if (!facultySnapshot.empty) {
-        facultySnapshot.docs.forEach((docSnapshot) => {
-          const facultyRef = doc(db, 'student', docSnapshot.id);
-          batch.update(facultyRef, {
-            numOnQueue: 0
-          });
-        });
-      }
-
-      await batch.commit();
-
-      Alert.alert('Success', `Cancelled ${waitingStudentsSnapshot.size} queues successfully and reset all faculty queue counts`);
-    } catch (error) {
-      console.error('Error cancelling all queues:', error);
-      Alert.alert('Error', 'Failed to cancel all queues');
-    }
-  };
+         });
+       }
+       
+       await batch.commit();
+       
+       Alert.alert('Success', `Cancelled ${waitingStudentsSnapshot.size} queues successfully and reset all faculty queue counts`);
+     } catch (error) {
+       console.error('Error cancelling all queues:', error);
+       Alert.alert('Error', 'Failed to cancel all queues');
+     }
+   };
 
 
 
@@ -114,7 +127,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
           {/* Queue Count Section */}
           <View style={styles.queueCountContainer}>
             <Text style={styles.queueTitle}>TOTAL</Text>
-            <Text style={styles.queueTitle}>STUDENT ON QUEUE</Text>
+            <Text style={styles.queueTitle}>WAITING STUDENT </Text>
             <Text style={styles.queueCount}>{queueCount}</Text> {/* Display the queueCount */}
 
             <View style={styles.headerButtonsContainer}>

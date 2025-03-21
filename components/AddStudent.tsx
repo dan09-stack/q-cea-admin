@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebaseConfig";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
 import { useAppTheme } from '../utils/theme';
@@ -45,6 +45,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
     email: "",
     password: "",
   });
+  
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
       window.alert(`${title}: ${message}`);
@@ -63,73 +64,122 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
     { label: "B.S. Mechanical Engineering", value: "ME" }
   ];
 
+  // Check if student information already exists in Firestore
+  const checkExistingStudent = async () => {
+    try {
+      const studentRef = collection(db, 'student');
+      
+      // Check for existing fullName
+      const nameQuery = query(studentRef, where("fullName", "==", formData.fullName));
+      const nameSnapshot = await getDocs(nameQuery);
+      if (!nameSnapshot.empty) {
+        return { exists: true, field: "Full Name" };
+      }
+      
+      // Check for existing idNumber
+      const idQuery = query(studentRef, where("idNumber", "==", formData.idNumber));
+      const idSnapshot = await getDocs(idQuery);
+      if (!idSnapshot.empty) {
+        return { exists: true, field: "ID Number" };
+      }
+      
+      // Check for existing phoneNumber
+      const phoneQuery = query(studentRef, where("phoneNumber", "==", formData.phoneNumber));
+      const phoneSnapshot = await getDocs(phoneQuery);
+      if (!phoneSnapshot.empty) {
+        return { exists: true, field: "Phone Number" };
+      }
+      
+      // Check for existing email
+      const emailQuery = query(studentRef, where("email", "==", formData.email));
+      const emailSnapshot = await getDocs(emailQuery);
+      if (!emailSnapshot.empty) {
+        return { exists: true, field: "Email" };
+      }
+      
+      return { exists: false };
+    } catch (error) {
+      console.error("Error checking existing student:", error);
+      return { exists: false, error };
+    }
+  };
+
   const validateForm = () => {
-    console.log("Validating form data:", formData); // Add this
+    console.log("Validating form data:", formData);
+    
+    // Check for empty fields
     if (!formData.fullName || !formData.idNumber || !formData.program || 
         !formData.phoneNumber || !formData.email || !formData.password) {
-      console.log("Validation failed: Missing fields"); // Add this
+      console.log("Validation failed: Missing fields");
       showAlert("Error", "Please fill in all fields");
       return false;
     }
+    
+    // Phone number format validation
+    // Check for Philippine phone number format (e.g., 09XXXXXXXXX or +639XXXXXXXXX)
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    if (!phoneRegex.test(formData.phoneNumber)) {
+      console.log("Validation failed: Invalid phone number format");
+      showAlert("Error", "Please enter a valid Philippine phone number (09XXXXXXXXX or +639XXXXXXXXX)");
+      return false;
+    }
+    
+    // Email validation (optional)
     // if (!formData.email.endsWith("@phinmaed.com")) {
-    //   console.log("Validation failed: Invalid email"); // Add this
+    //   console.log("Validation failed: Invalid email");
     //   showAlert("Error", "Please use a valid PHINMA email address");
     //   return false;
     // }
+    
     return true;
   };
 
   const handleAdd = async () => {
-    console.log("Add button clicked"); // Add this
-    if (validateForm()) {
-      console.log("Form validated"); // Add this
-      setIsLoading(true);
-      try {
-        console.log("Starting user creation"); // Add this
-        // const userCredential = await createUserWithEmailAndPassword(
-        //   auth,
-        //   formData.email,
-        //   formData.password
-        // );
-        // console.log("User created:", userCredential); // Add this
-  
-        // const userRef = collection(db, 'student');
-        // await addDoc(userRef, {
-        //   uid: userCredential.user.uid,
-        //   fullName: formData.fullName,
-        //   idNumber: formData.idNumber,
-        //   program: formData.program,
-        //   phoneNumber: formData.phoneNumber,
-        //   email: formData.email,
-        //   userType: 'student',
-        //   createdAt: new Date().toISOString()
-        // });
-
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        const user = userCredential.user;
-
-        await db.collection('student').doc(user.uid).set({
-          fullName: formData.fullName,
-          idNumber: formData.idNumber,
-          phoneNumber: formData.phoneNumber,
-          program: formData.program,
-          email: formData.email,
-          isVerified:true,
-          userType: 'STUDENT'
-        });
-        await sendEmailVerification(user);
-  
-        showAlert("Success", "Student added successfully");
-        onClose();
-      } catch (error: any) {
-        console.error("Detailed error:", error); // Add detailed logging
-        showAlert(
-          "Error", 
-          error.message || "Failed to add student" // Show actual error message
-        );
-      } finally {
+    console.log("Add button clicked");
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Check if student already exists
+      const existingCheck = await checkExistingStudent();
+      if (existingCheck.exists) {
+        showAlert("Error", `A student with this ${existingCheck.field} already exists.`);
         setIsLoading(false);
+        return;
       }
+      
+      console.log("Starting user creation");
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      await db.collection('student').doc(user.uid).set({
+        fullName: formData.fullName,
+        idNumber: formData.idNumber,
+        phoneNumber: formData.phoneNumber,
+        program: formData.program,
+        email: formData.email,
+        isVerified: true,
+        userType: 'STUDENT',
+        status: 'OFFLINE',
+        createdAt: new Date().toISOString()
+      });
+      
+      await sendEmailVerification(user);
+  
+      showAlert("Success", "Student added successfully");
+      onClose();
+    } catch (error: any) {
+      console.error("Detailed error:", error);
+      showAlert(
+        "Error", 
+        error.message || "Failed to add student"
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -182,7 +232,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         <Text style={styles.label}>Phone Number</Text>
         <TextInput
           style={styles.input}
-          placeholder="Phone Number"
+          placeholder="Phone Number (09XXXXXXXXX)"
           placeholderTextColor="#000000"
           keyboardType="phone-pad"
           value={formData.phoneNumber}
@@ -215,15 +265,22 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={getButtonStyle(styles.cancelButton, true)} onPress={onClose}>
+        <TouchableOpacity 
+          style={getButtonStyle(styles.cancelButton, true)} 
+          onPress={onClose}
+          disabled={isLoading}
+        >
           <Text style={styles.buttonText}>CANCEL</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={getButtonStyle(styles.addButton)} 
-          onPress={() => {
-            handleAdd();
-          }}        >
-          <Text style={styles.buttonText}>ADD</Text>
+          style={[
+            getButtonStyle(styles.addButton),
+            isLoading ? styles.disabledButton : null
+          ]} 
+          onPress={handleAdd}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonText}>{isLoading ? "ADDING..." : "ADD"}</Text>
         </TouchableOpacity>
       </View>
       </View>
@@ -327,7 +384,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
-
-
 
 export default AddStudentScreen;

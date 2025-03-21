@@ -11,7 +11,7 @@ export default function Layout() {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setIsAuthenticated(true);
-        router.replace('/(screens)/AdminDashboard'); // If authenticated, go to the welcome screen
+        // router.replace('/(screens)/AdminDashboard'); // If authenticated, go to the welcome screen
       } else {
         setIsAuthenticated(false);
         router.replace('/'); // If not authenticated, go to login

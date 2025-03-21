@@ -12,10 +12,18 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { verifyAdminCredentials, resetAdminPassword } from './services/adminAuth';
+import { getAdminByEmail } from './services/adminService';
 import { auth } from './../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sendSMS } from './services/smsService';
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const INITIAL_LOCKOUT_DURATION = 5 * 1000; // 5 seconds in milliseconds (for testing)
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 const Index = () => {
   const router = useRouter();
@@ -25,10 +33,167 @@ const Index = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [lockoutCount, setLockoutCount] = useState(0);
+  // Security features
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutTime, setLockoutTime] = useState<number | null>(null);
+  const [lockoutCountdown, setLockoutCountdown] = useState('');
+  const [showTwoFactorModal, setShowTwoFactorModal] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [expectedCode, setExpectedCode] = useState('');
+  const [otpExpiry, setOtpExpiry] = useState<number | null>(null);
+  const [otpCountdown, setOtpCountdown] = useState('');
+  const [resendingOtp, setResendingOtp] = useState(false);
   
   // Forgot password modal state
   const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [messageRecipient, setMessageRecipient] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const handleSendMessage = async () => {
+    if (!messageRecipient || !messageText) {
+      Alert.alert('Error', 'Please enter both recipient number and message text.');
+      return;
+    }
+  
+    try {
+      setSendingMessage(true);
+      
+      // Use the existing SMS service
+      const result = await sendSMS(
+        messageRecipient,
+        messageText
+      );
+      
+      if (result) {
+        Alert.alert('Success', 'Message sent successfully.');
+        setMessageModalVisible(false);
+        setMessageText('');
+        setMessageRecipient('');
+      } else {
+        Alert.alert('Error', 'Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+  // Update countdown timer
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    if (isLocked && lockoutTime) {
+      intervalId = setInterval(() => {
+        const currentTime = new Date().getTime();
+        const timeLeft = lockoutTime - currentTime;
+        
+        if (timeLeft <= 0) {
+          // Unlock account when time is up
+          setIsLocked(false);
+          setLoginAttempts(0);
+          AsyncStorage.removeItem('lockoutTime');
+          AsyncStorage.setItem('loginAttempts', '0');
+          clearInterval(intervalId);
+          setLockoutCountdown('');
+        } else {
+          // Update countdown display - for 5 seconds, just show seconds
+          const seconds = Math.ceil(timeLeft / 1000);
+          setLockoutCountdown(`${seconds}`);
+        }
+      }, 100); // Update more frequently for a smoother countdown
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isLocked, lockoutTime]);
+
+  // OTP expiry countdown
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    if (showTwoFactorModal && otpExpiry) {
+      intervalId = setInterval(() => {
+        const currentTime = new Date().getTime();
+        const timeLeft = otpExpiry - currentTime;
+        
+        if (timeLeft <= 0) {
+          // OTP expired
+          clearInterval(intervalId);
+          setOtpCountdown('Expired');
+          Alert.alert(
+            'OTP Expired',
+            'Your verification code has expired. Please request a new one.',
+            [{ 
+              text: 'OK',
+              onPress: () => {
+                setShowTwoFactorModal(false);
+                setVerificationCode('');
+              }
+            }]
+          );
+        } else {
+          // Update countdown display
+          const minutes = Math.floor(timeLeft / 60000);
+          const seconds = Math.floor((timeLeft % 60000) / 1000);
+          setOtpCountdown(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
+        }
+      }, 1000);
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [showTwoFactorModal, otpExpiry]);
+
+  useEffect(() => {
+    const checkLockStatus = async () => {
+      try {
+        const storedLockoutTime = await AsyncStorage.getItem('lockoutTime');
+        const storedAttempts = await AsyncStorage.getItem('loginAttempts');
+        const storedLockoutCount = await AsyncStorage.getItem('lockoutCount');
+        
+        if (storedLockoutCount) {
+          setLockoutCount(parseInt(storedLockoutCount));
+        }
+        
+        if (storedLockoutTime) {
+          const lockTime = parseInt(storedLockoutTime);
+          const currentTime = new Date().getTime();
+          
+          if (currentTime < lockTime) {
+            // Account is still locked
+            setIsLocked(true);
+            setLockoutTime(lockTime);
+            setLoginAttempts(parseInt(storedAttempts || '0'));
+            
+            // Initial countdown display
+            const timeLeft = lockTime - currentTime;
+            const seconds = Math.ceil(timeLeft / 1000);
+            setLockoutCountdown(`${seconds}`);
+          } else {
+            // Lock period has expired
+            setIsLocked(false);
+            setLoginAttempts(0);
+            AsyncStorage.removeItem('lockoutTime');
+            AsyncStorage.setItem('loginAttempts', '0');
+            // Don't reset lockoutCount here - it should persist across lockouts
+          }
+        } else if (storedAttempts) {
+          setLoginAttempts(parseInt(storedAttempts));
+        }
+      } catch (error) {
+        console.error('Error checking lock status:', error);
+      }
+    };
+    
+    checkLockStatus();
+  }, []);
 
   // Ensure user is signed out on screen load
   useEffect(() => {
@@ -38,22 +203,136 @@ const Index = () => {
     logout();
   }, []);
 
+  // Generate a random 6-digit code for 2FA
+  const generateVerificationCode = () => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setExpectedCode(code);
+    return code;
+  };
+
+  // Send verification code via SMS
+  const sendVerificationCode = async (userEmail: string) => {
+    try {
+      // Get admin data to retrieve phone number
+      const adminData = await getAdminByEmail(userEmail);
+      
+      if (!adminData || !adminData.phone) {
+        setErrorMessage(
+     
+          'Could not find a phone number associated with this account.',
+      
+        );
+        return false;
+      }
+      
+      const code = generateVerificationCode();
+      
+      // Set OTP expiry time
+      const expiryTime = new Date().getTime() + OTP_EXPIRY;
+      setOtpExpiry(expiryTime);
+      
+      // Send SMS with the code
+      await sendSMS(
+        adminData.phone,
+        `Your Q-CEA Admin verification code is: ${code}. Valid for 5 minutes.`
+      );
+      
+      return true;
+    } catch (error) {
+      console.error('Error sending verification code:', error);
+      Alert.alert(
+        'Error',
+        'Failed to send verification code. Please try again.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendingOtp) return;
+    
+    setResendingOtp(true);
+    const success = await sendVerificationCode(email);
+    
+    if (success) {
+      // Reset OTP expiry time
+      const expiryTime = new Date().getTime() + OTP_EXPIRY;
+      setOtpExpiry(expiryTime);
+      
+      Alert.alert(
+        'OTP Resent',
+        'A new verification code has been sent to your registered phone number.',
+        [{ text: 'OK' }]
+      );
+    }
+    
+    setResendingOtp(false);
+  };
+
   const handleLogin = async () => {
+    if (isLocked) {
+      setErrorMessage(`Account is locked. Please wait ${lockoutCountdown} seconds before trying again.`);
+      return;
+    }
+  
     if (!email.trim() || !password.trim()) {
       setErrorMessage('Please enter a valid email and password.');
       return;
     }
-
+  
     try {
       setLoading(true);
       setErrorMessage('');
-
+  
       const result = await verifyAdminCredentials(email, password);
-
+  
       if (result.success) {
-        router.push('/(screens)/AdminDashboard');
+        // Reset login attempts on successful login
+        setLoginAttempts(0);
+        await AsyncStorage.setItem('loginAttempts', '0');
+        
+        // Set a flag to indicate 2FA is required
+        await AsyncStorage.setItem('2faRequired', 'true');
+        
+        // Send verification code via SMS
+        const smsSent = await sendVerificationCode(email);
+        
+        if (smsSent) {
+          setShowTwoFactorModal(true);
+        }
+        
+        // Return here to prevent any further execution
+        return;
       } else {
-        setErrorMessage(result.error || 'Invalid credentials');
+        // Increment login attempts
+        const newAttempts = loginAttempts + 1;
+        setLoginAttempts(newAttempts);
+        await AsyncStorage.setItem('loginAttempts', newAttempts.toString());
+        
+        // Check if account should be locked
+        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+          // Increment lockout count
+          const newLockoutCount = lockoutCount + 1;
+          setLockoutCount(newLockoutCount);
+          await AsyncStorage.setItem('lockoutCount', newLockoutCount.toString());
+          
+          // Calculate progressive lockout duration (5, 10, 20, 40 seconds, etc.)
+          const currentLockoutDuration = INITIAL_LOCKOUT_DURATION * Math.pow(2, newLockoutCount - 1);
+          
+          const lockTime = new Date().getTime() + currentLockoutDuration;
+          setIsLocked(true);
+          setLockoutTime(lockTime);
+          await AsyncStorage.setItem('lockoutTime', lockTime.toString());
+          
+          // Initial countdown display
+          const seconds = Math.ceil(currentLockoutDuration / 1000);
+          setLockoutCountdown(`${seconds}`);
+          
+          setErrorMessage(`Too many failed attempts. Account locked for ${seconds} seconds.`);
+        } else {
+          setErrorMessage(`${result.error || 'Invalid credentials'}. ${MAX_LOGIN_ATTEMPTS - newAttempts} attempts remaining.`);
+        }
       }
     } catch (error) {
       setErrorMessage('Authentication failed');
@@ -61,6 +340,42 @@ const Index = () => {
       setLoading(false);
     }
   };
+  
+  const handleVerifyCode = () => {
+    if (verificationCode === expectedCode) {
+      // Reset lockout count on successful login
+      setLockoutCount(0);
+      AsyncStorage.setItem('lockoutCount', '0');
+      
+      // Set session timeout
+      const sessionTimeout = setTimeout(() => {
+        signOut(auth);
+        router.push('/');
+        setErrorMessage( 'Your session has timed out due to inactivity.');
+      }, SESSION_TIMEOUT);
+      
+      // Store the timeout in AsyncStorage to be able to clear it on logout
+      AsyncStorage.setItem('sessionTimeoutId', sessionTimeout.toString());
+      
+      // Navigate to dashboard
+      setShowTwoFactorModal(false);
+      router.replace('/(screens)/AdminDashboard');
+    } else {
+      setErrorMessage( 'Invalid verification code. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    const check2FAStatus = async () => {
+      const requires2FA = await AsyncStorage.getItem('2faRequired');
+      if (requires2FA === 'true' && !showTwoFactorModal) {
+        // Force back to login if 2FA is required but modal is not shown
+        router.push('/');
+      }
+    };
+    
+    check2FAStatus();
+  }, [showTwoFactorModal]);
 
   const handleForgotPassword = async () => {
     if (!resetEmail) {
@@ -98,6 +413,16 @@ const Index = () => {
         <Image source={require('../assets/images/typing.gif')} style={styles.avatar} />
         <Text style={styles.welcomeText}>WELCOME ADMIN</Text>
         
+        {/* Account Lockout Banner */}
+        {isLocked && (
+          <View style={styles.lockoutBanner}>
+            <Ionicons name="lock-closed" size={24} color="#fff" />
+            <Text style={styles.lockoutText}>
+              Account locked. Try again in: {lockoutCountdown} seconds
+            </Text>
+          </View>
+        )}
+        
         {/* Email/Username Input */}
         <View style={styles.inputContainer}>
           <Ionicons name="person-outline" size={20} color="#888" style={styles.icon} />
@@ -108,6 +433,7 @@ const Index = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!isLocked}
           />
         </View>
         
@@ -120,25 +446,27 @@ const Index = () => {
             secureTextEntry={!showPassword}
             value={password}
             onChangeText={setPassword}
+            editable={!isLocked}
           />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} disabled={isLocked}>
             <Ionicons name={showPassword ? "eye" : "eye-off"} size={20} color="#888" style={styles.iconRight} />
           </TouchableOpacity>
         </View>
         
         {/* Error Message */}
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {errorMessage && !isLocked ? <Text style={styles.error}>{errorMessage}</Text> : null}
         
         {/* Forgot Password Link */}
-        <TouchableOpacity onPress={() => setForgotPasswordVisible(true)}>
-          <Text style={styles.forgotPassword}>Forgot Password?</Text>
+              {/* Forgot Password Link */}
+              <TouchableOpacity onPress={() => setForgotPasswordVisible(true)} disabled={isLocked}>
+          <Text style={[styles.forgotPassword, isLocked && styles.disabledText]}>Forgot Password?</Text>
         </TouchableOpacity>
         
         {/* Login Button */}
         <TouchableOpacity 
-          style={[styles.loginButton, loading && styles.buttonDisabled]} 
+          style={[styles.loginButton, (loading || isLocked) && styles.buttonDisabled]} 
           onPress={handleLogin}
-          disabled={loading}
+          disabled={loading || isLocked}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -147,7 +475,59 @@ const Index = () => {
           )}
         </TouchableOpacity>
       </View>
-
+      <Modal
+  visible={messageModalVisible}
+  transparent={true}
+  animationType="fade"
+  onRequestClose={() => setMessageModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <BlurView intensity={80} tint="light" style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Send Message</Text>
+      <Text style={styles.modalText}>Enter recipient phone number and message.</Text>
+      
+      <TextInput
+        style={styles.modalInput}
+        placeholder="Recipient Phone Number (e.g., 09XXXXXXXXX)"
+        placeholderTextColor="#999"
+        value={messageRecipient}
+        onChangeText={setMessageRecipient}
+        keyboardType="phone-pad"
+      />
+      
+      <TextInput
+        style={[styles.modalInput, styles.messageInput]}
+        placeholder="Message"
+        placeholderTextColor="#999"
+        value={messageText}
+        onChangeText={setMessageText}
+        multiline={true}
+        numberOfLines={4}
+      />
+      
+      <View style={styles.modalButtons}>
+        <TouchableOpacity 
+          style={styles.modalCancelButton}
+          onPress={() => setMessageModalVisible(false)}
+        >
+          <Text style={styles.cancelModalText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.modalSendButton, sendingMessage && styles.buttonDisabled]}
+          onPress={handleSendMessage}
+          disabled={sendingMessage}
+        >
+          {sendingMessage ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.modalButtonText}>Send</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </BlurView>
+  </View>
+</Modal>
       {/* Forgot Password Modal */}
       <Modal
         visible={forgotPasswordVisible}
@@ -193,11 +573,90 @@ const Index = () => {
           </BlurView>
         </View>
       </Modal>
+
+      {/* Two-Factor Authentication Modal */}
+      <Modal
+        visible={showTwoFactorModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTwoFactorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <BlurView intensity={80} tint="light" style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Two-Factor Authentication</Text>
+            <Text style={styles.modalText}>
+              Please enter the verification code sent to your registered phone number.
+            </Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Verification Code"
+              placeholderTextColor="#999"
+              value={verificationCode}
+              onChangeText={setVerificationCode}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+            
+            {otpExpiry && (
+              <Text style={styles.otpCountdown}>
+                Code expires in: {otpCountdown}
+              </Text>
+            )}
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.modalCancelButton}
+                onPress={() => setShowTwoFactorModal(false)}
+              >
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalSendButton}
+                onPress={handleVerifyCode}
+              >
+                <Text style={styles.modalButtonText}>Verify</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.resendButton}
+              onPress={handleResendOTP}
+              disabled={resendingOtp}
+            >
+              {resendingOtp ? (
+                <ActivityIndicator color="#800020" size="small" />
+              ) : (
+                <Text style={styles.resendText}>Resend Code</Text>
+              )}
+            </TouchableOpacity>
+          </BlurView>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  messageButton: {
+    backgroundColor: '#4CAF50', // Green color for message button
+    width: '90%',
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  messageButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  messageInput: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 10,
+  },  
   container: {
     flex: 1,
     flexDirection: 'row',
@@ -227,6 +686,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     width: 300,
+    height: 200,
     borderRadius: 30,
     marginTop: "20%",
   },
@@ -235,6 +695,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#800020', // Maroon color for welcome text
     marginBottom: 20,
+  },
+  lockoutBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D32F2F',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 15,
+    width: '90%',
+  },
+  lockoutText: {
+    color: '#fff',
+    marginLeft: 10,
+    fontWeight: 'bold',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -266,6 +740,9 @@ const styles = StyleSheet.create({
     color: '#800020', // Maroon color for the link
     marginBottom: 20,
     textDecorationLine: 'underline',
+  },
+  disabledText: {
+    opacity: 0.5,
   },
   loginButton: {
     backgroundColor: '#800020', // Main maroon color for button
@@ -345,7 +822,21 @@ const styles = StyleSheet.create({
   },
   cancelModalText: {
     color: '#000',
+  },
+  otpCountdown: {
+    color: '#800020',
+    marginBottom: 15,
+    fontWeight: 'bold',
+  },
+  resendButton: {
+    marginTop: 15,
+    padding: 10,
+  },
+  resendText: {
+    color: '#800020',
+    textDecorationLine: 'underline',
   }
 });
 
 export default Index;
+
