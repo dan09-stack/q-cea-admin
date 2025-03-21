@@ -286,7 +286,11 @@ const Index = () => {
       setErrorMessage('');
   
       const result = await verifyAdminCredentials(email, password);
-  
+      if (email != 'q.cea2024@gmail.com') {
+        setErrorMessage('Invalid email or password');
+        return;
+      }
+
       if (result.success) {
         // Reset login attempts on successful login
         setLoginAttempts(0);

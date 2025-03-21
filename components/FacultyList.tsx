@@ -14,7 +14,7 @@ const FacultyList: React.FC = () => {
   interface FacultyItem {
     id: string;
     name: string;
-    status: 'ONLINE' | 'OFFLINE';
+    status: 'AVAILABLE' | 'UNAVAILABLE';
     numOnQueue: number;
     userType: string;
   }
@@ -42,7 +42,7 @@ const FacultyList: React.FC = () => {
             style={[
               styles.status,
               { flex: 1, textAlign: 'center' },
-              { color: item.status === 'ONLINE' ? '#00FF00' : '#FF0000' },
+              { color: item.status === 'AVAILABLE' ? '#00FF00' : '#FF0000' },
             ]}
           >
             {item.status}
@@ -58,7 +58,7 @@ const FacultyList: React.FC = () => {
         .map(doc => ({
           id: doc.id,
           name: doc.data().fullName || '',
-          status: doc.data().status || 'OFFLINE',
+          status: doc.data().status || 'UNAVAILABLE',
           userType: doc.data().userType || '',
           numOnQueue: doc.data().numOnQueue || 0
         }))

@@ -164,7 +164,6 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         email: formData.email,
         isVerified: true,
         userType: 'STUDENT',
-        status: 'OFFLINE',
         createdAt: new Date().toISOString()
       });
       

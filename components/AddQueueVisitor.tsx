@@ -41,7 +41,7 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
   // Fetch faculty list
   useEffect(() => {
     const facultyRef = collection(db, "student");
-    const q = query(facultyRef, where("userType", "==", "FACULTY"), where("status", "==", "ONLINE"));
+    const q = query(facultyRef, where("userType", "==", "FACULTY"), where("status", "==", "AVAILABLE"));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const faculty: Array<{id: string, fullName: string, status: string, numOnQueue?: number}> = [];
@@ -49,7 +49,7 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
         faculty.push({
           id: doc.id,
           fullName: doc.data().fullName || "",
-          status: doc.data().status || "OFFLINE",
+          status: doc.data().status || "UNAVAILABLE",
           numOnQueue: doc.data().numOnQueue || 0,
         });
       });
@@ -60,19 +60,27 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
   }, []);
 
   // Fetch concerns list
-  useEffect(() => {
-    // Common concerns
-    const defaultConcerns = [
-      "Academic Advising",
-      "Course Registration",
-      "Thesis Consultation",
-      "Project Guidance",
-      "Career Counseling",
-      "Technical Support",
-      "Other",
-    ];
-    setConcernsList(defaultConcerns);
-  }, []);
+// Fetch concerns list
+useEffect(() => {
+  // Fetch concerns from Firestore
+  const concernDoc = doc(db, 'admin', 'concern');
+  
+  const unsubscribeConcerns = onSnapshot(concernDoc, (doc) => {
+    if (doc.exists()) {
+      const concerns = doc.data().concern || [];
+      setConcernsList(concerns);
+    } else {
+      // Fallback to default concerns if document doesn't exist
+      const defaultConcerns = [
+        "",
+      ];
+      setConcernsList(defaultConcerns);
+    }
+  });
+
+  return () => unsubscribeConcerns();
+}, []);
+
 
   const handleSubmit = async () => {
     if (!visitorName.trim()) {

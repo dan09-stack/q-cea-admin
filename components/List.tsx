@@ -57,7 +57,7 @@ const List: React.FC = () => {
 
   // Status options
   const statusOptions = [
-    "ONLINE", "OFFLINE"
+    "AVAILABLE", "UNAVAILABLE"
   ];
 
   const showAlert = (title: string, message: string) => {
@@ -83,7 +83,7 @@ const List: React.FC = () => {
           userType: data.userType || '',
           rfid_uid: data.rfid_uid || '',
           program: data.program || '',
-          status: data.status || 'OFFLINE',
+          status: data.status || 'UNAVAILABLE',
           numOnQueue: data.numOnQueue || 0,
           phoneNumber: data.phoneNumber || '',
           idNumber: data.idNumber || '',
@@ -304,7 +304,7 @@ const List: React.FC = () => {
         userType: formData.userType,
         rfid_uid: formData.rfid_uid || '',
         program: formData.program || '',
-        status: formData.status || 'OFFLINE',
+        status: formData.status || 'UNAVAILABLE',
         numOnQueue: formData.numOnQueue || 0,
         phoneNumber: formData.phoneNumber || '',
         idNumber: formData.idNumber || '',
@@ -336,7 +336,7 @@ const List: React.FC = () => {
   // Open create user modal
   const openCreateModal = () => {
     setFormData({
-      status: 'OFFLINE',
+      status: 'UNAVAILABLE',
       numOnQueue: 0,
       userType: 'STUDENT',
       archived: false
@@ -356,7 +356,7 @@ const List: React.FC = () => {
         <Text style={styles.userDetail}>
           Ticket Number: {item.userTicketNumber || 'No active ticket'}</Text>
         <Text style={styles.userDetail}>Status: 
-          <Text style={item.status === 'ONLINE' ? styles.statusOnline : styles.statusOffline}>
+          <Text style={item.status === 'AVAILABLE' ? styles.statusOnline : styles.statusOffline}>
             {item.status}
           </Text>
         </Text>

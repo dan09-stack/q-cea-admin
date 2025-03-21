@@ -167,7 +167,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           isVerified: true,
           userType: 'FACULTY',
           numOnQueue: 0,
-          status: 'OFFLINE',
+          status: 'UNAVAILABLE',
           rfid_uid: formData.rfid_uid,
           createdAt: new Date().toISOString()
         });

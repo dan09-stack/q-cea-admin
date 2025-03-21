@@ -164,7 +164,7 @@ const Settings: React.FC = () => {
       waitingStudentsSnapshot.docs.forEach((docSnapshot) => {
         const studentRef = doc(db, 'student', docSnapshot.id);
         batch.update(studentRef, {
-          status: 'OFFLINE',
+          status: 'UNAVAILABLE',
           numOnQueue: 0
         });
       });
@@ -180,12 +180,12 @@ const Settings: React.FC = () => {
       facultySnapshot.docs.forEach((docSnapshot) => {
         const facultyRef = doc(db, 'student', docSnapshot.id);
         batch.update(facultyRef, {
-          status: 'OFFLINE'
+          status: 'UNAVAILABLE'
         });
       });
       
       await batch.commit();
-      showAlert('Success', 'All queues have been cancelled and faculty set to offline.');
+      showAlert('Success', 'All queues have been cancelled and faculty set to UNAVAILABLE.');
     } catch (error) {
       console.error('Error cancelling queues:', error);
       showAlert('Error', 'Failed to cancel queues.');
@@ -215,7 +215,7 @@ const Settings: React.FC = () => {
           facultySnapshot.docs.forEach((docSnapshot: DocumentSnapshot) => {
             const facultyRef = doc(db, 'student', docSnapshot.id);
             batch.update(facultyRef, {
-              status: 'OFFLINE'
+              status: 'UNAVAILABLE'
             });
           });
         }
@@ -366,7 +366,7 @@ const Settings: React.FC = () => {
               {renderTimePickers()}
               
               <Text style={styles.infoText}>
-                The system will automatically cancel all queues and set faculty to offline 
+                The system will automatically cancel all queues and set faculty to UNAVAILABLE 
                 outside of business hours.
               </Text>
             </>

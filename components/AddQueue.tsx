@@ -163,7 +163,7 @@ useEffect(() => {
       const faculty = snapshot.docs.map((doc) => ({
         id: doc.id,
         fullName: doc.data().fullName || '',
-        status: doc.data().status || 'OFFLINE'
+        status: doc.data().status || 'UNAVAILABLE'
       }));
       setFacultyList(faculty);
     });
@@ -272,7 +272,7 @@ useEffect(() => {
           facultySnapshot.docs.forEach((docSnapshot: DocumentSnapshot) => {
             const facultyRef = doc(db, 'student', docSnapshot.id);
             batch.update(facultyRef, {
-              status: 'OFFLINE'
+              status: 'UNAVAILABLE'
             });
           });
         }
@@ -381,8 +381,8 @@ useEffect(() => {
     }
 
     const selectedFacultyData = facultyList.find(f => f.fullName === selectedFaculty);
-    if (selectedFacultyData?.status !== 'ONLINE') {
-      showAlert('Selected faculty is not online');
+    if (selectedFacultyData?.status !== 'AVAILABLE') {
+      showAlert('Selected faculty is UNAVAILABLE');
       return;
     }
   
@@ -823,7 +823,7 @@ useEffect(() => {
                           key={faculty.id}
                           label={faculty.fullName}
                           value={faculty.fullName}
-                          color={faculty.status === 'ONLINE' ? '#4CAF50' : '#757575'}
+                          color={faculty.status === 'AVAILABLE' ? '#4CAF50' : '#757575'}
                         />
                       ))}
                   </Picker>
