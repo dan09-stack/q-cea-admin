@@ -16,7 +16,7 @@ import {
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import Icon from 'react-native-vector-icons/Ionicons';
-
+import { getFunctions, httpsCallable } from 'firebase/functions';
 interface UserItem {
   id: string;
   email: string;  
@@ -152,121 +152,52 @@ const List: React.FC = () => {
     }
   };
 
-  // Confirm delete
   const confirmDelete = async () => {
     if (!selectedUser) return;
     
     try {
+      // Delete from Firestore
       await deleteDoc(doc(db, 'student', selectedUser.id));
+      
+      // Call a backend function to delete the user from Authentication
+      if (selectedUser.email) {
+        try {
+          // This assumes you've created a Cloud Function named 'deleteAuthUser'
+          const deleteAuthUser = httpsCallable(getFunctions(), 'deleteAuthUser');
+          await deleteAuthUser({ email: selectedUser.email });
+        } catch (authError: any) {
+          console.error('Error deleting user from authentication:', authError);
+          // Continue with success message even if auth deletion fails
+        }
+      }
+      
       showAlert('Success', 'User deleted successfully!');
       setDeleteModalVisible(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting user:', error);
       showAlert('Error', 'Failed to delete user. Please try again.');
     }
   };
 
   // Save edited user with duplicate checking
-  const saveUser = async () => {
-    if (!selectedUser || !formData) return;
-    if (!formData.fullName || !formData.idNumber || !formData.phoneNumber) {
-      showAlert('Error', 'Full Name, ID Number, and Phone Number are required fields.');
-      return;
-    }
-    try {
-      // Check if any fields have changed that need duplicate checking
-      const fieldsToCheck = [];
-      if (formData.fullName !== selectedUser.fullName) fieldsToCheck.push('fullName');
-      if (formData.idNumber !== selectedUser.idNumber) fieldsToCheck.push('idNumber');
-      if (formData.phoneNumber !== selectedUser.phoneNumber) fieldsToCheck.push('phoneNumber');
-      
-      // If any of these fields changed, check for duplicates
-      if (fieldsToCheck.length > 0) {
-        setIsLoading(true);
-        
-        // Create queries for each field that needs checking
-        const duplicateChecks = fieldsToCheck.map(async (field) => {
-          const fieldValue = formData[field as keyof typeof formData];
-          if (!fieldValue) return null;
-          
-          const fieldQuery = query(
-            collection(db, 'student'),
-            where(field, '==', fieldValue),
-          );
-          
-          const querySnapshot = await getDocs(fieldQuery);
-          
-          // Check if any document exists with this value (excluding the current user)
-          const duplicates = querySnapshot.docs.filter(doc => doc.id !== selectedUser.id);
-          
-          if (duplicates.length > 0) {
-            return { field, value: fieldValue };
-          }
-          return null;
-        });
-        
-        // Wait for all duplicate checks to complete
-        const results = await Promise.all(duplicateChecks);
-        const foundDuplicates = results.filter(result => result !== null);
-        
-        if (foundDuplicates.length > 0) {
-          const fieldNameMap = {
-            'fullName': 'Full Name',
-            'idNumber': 'ID Number',
-            'phoneNumber': 'Phone Number',
-            'email': 'Email'
-          };
-          
-          const duplicateFieldNames = foundDuplicates
-            .map(d => fieldNameMap[d?.field as keyof typeof fieldNameMap] || d?.field)
-            .join(', ');
-            
-          showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFieldNames}. Please use different values.`);
-          setIsLoading(false);
-          return;
-        }
-      }
-      
-      // If no duplicates found, proceed with the update
-      const userRef = doc(db, 'student', selectedUser.id);
-      await updateDoc(userRef, {
-        email: formData.email,
-        fullName: formData.fullName,
-        userType: formData.userType,
-        rfid_uid: formData.rfid_uid,
-        program: formData.program,
-        status: formData.status,
-        numOnQueue: formData.numOnQueue || 0,
-        phoneNumber: formData.phoneNumber,
-        idNumber: formData.idNumber,
-        userTicketNumber: formData.userTicketNumber,
-        archived: formData.archived
-      });
-      
-      showAlert('Success', 'User updated successfully!');
-      setModalVisible(false);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      showAlert('Error', 'Failed to update user. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Create new user with duplicate checking
-  const createUser = async () => {
-    if (!formData.email || !formData.fullName || !formData.userType) {
-      showAlert('Error', 'Email, Name and User Type are required');
-      return;
-    }
+ // Save edited user with duplicate checking
+const saveUser = async () => {
+  if (!selectedUser || !formData) return;
+  if (!formData.fullName || !formData.idNumber || !formData.phoneNumber) {
+    showAlert('Error', 'Full Name, ID Number, and Phone Number are required fields.');
+    return;
+  }
+  try {
+    // Check if any fields have changed that need duplicate checking
+    const fieldsToCheck = [];
+    if (formData.idNumber !== selectedUser.idNumber) fieldsToCheck.push('idNumber');
+    if (formData.phoneNumber !== selectedUser.phoneNumber) fieldsToCheck.push('phoneNumber');
+    // Add RFID UID check if it has changed and is not empty
+    if (formData.rfid_uid !== selectedUser.rfid_uid && formData.rfid_uid) fieldsToCheck.push('rfid_uid');
     
-    try {
+    // If any of these fields changed, check for duplicates
+    if (fieldsToCheck.length > 0) {
       setIsLoading(true);
-      
-      // Fields to check for duplicates
-      const fieldsToCheck = ['email', 'fullName', 'idNumber', 'phoneNumber'].filter(
-        field => formData[field as keyof typeof formData]
-      );
       
       // Create queries for each field that needs checking
       const duplicateChecks = fieldsToCheck.map(async (field) => {
@@ -280,7 +211,10 @@ const List: React.FC = () => {
         
         const querySnapshot = await getDocs(fieldQuery);
         
-        if (!querySnapshot.empty) {
+        // Check if any document exists with this value (excluding the current user)
+        const duplicates = querySnapshot.docs.filter(doc => doc.id !== selectedUser.id);
+        
+        if (duplicates.length > 0) {
           return { field, value: fieldValue };
         }
         return null;
@@ -291,39 +225,139 @@ const List: React.FC = () => {
       const foundDuplicates = results.filter(result => result !== null);
       
       if (foundDuplicates.length > 0) {
-        const duplicateFields = foundDuplicates.map(d => d?.field).join(', ');
-        showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFields}. Please use different values.`);
+        const fieldNameMap = {
+          'idNumber': 'ID Number',
+          'phoneNumber': 'Phone Number',
+          'email': 'Email',
+          'rfid_uid': 'RFID UID'  // Add RFID UID to the field name map
+        };
+        
+        const duplicateFieldNames = foundDuplicates
+          .map(d => fieldNameMap[d?.field as keyof typeof fieldNameMap] || d?.field)
+          .join(', ');
+          
+        showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFieldNames}. Please use different values.`);
         setIsLoading(false);
         return;
       }
-      
-      // If no duplicates found, proceed with creating the user
-      await addDoc(collection(db, 'student'), {
-        email: formData.email,
-        fullName: formData.fullName,
-        userType: formData.userType,
-        rfid_uid: formData.rfid_uid || '',
-        program: formData.program || '',
-        status: formData.status || 'UNAVAILABLE',
-        numOnQueue: formData.numOnQueue || 0,
-        phoneNumber: formData.phoneNumber || '',
-        idNumber: formData.idNumber || '',
-        isVerified: true,
-        createdAt: new Date(),
-        userTicketNumber: formData.userTicketNumber || '',
-        archived: false
-      });
-      
-      showAlert('Success', 'User created successfully!');
-      setCreateModalVisible(false);
-      setFormData({});
-    } catch (error) {
-      console.error('Error creating user:', error);
-      showAlert('Error', 'Failed to create user. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
-  };
+    
+    // If no duplicates found, proceed with the update
+    const userRef = doc(db, 'student', selectedUser.id);
+    await updateDoc(userRef, {
+      email: formData.email,
+      fullName: formData.fullName,
+      userType: formData.userType,
+      rfid_uid: formData.rfid_uid,
+      program: formData.program,
+      status: formData.status,
+      numOnQueue: formData.numOnQueue || 0,
+      phoneNumber: formData.phoneNumber,
+      idNumber: formData.idNumber,
+      userTicketNumber: formData.userTicketNumber,
+      archived: formData.archived
+    });
+    
+    showAlert('Success', 'User updated successfully!');
+    setModalVisible(false);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    showAlert('Error', 'Failed to update user. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
+  // Create new user with duplicate checking
+  // Create new user with duplicate checking
+const createUser = async () => {
+  if (!formData.email || !formData.fullName || !formData.userType) {
+    showAlert('Error', 'Email, Name and User Type are required');
+    return;
+  }
+  
+  try {
+    setIsLoading(true);
+    
+    // Fields to check for duplicates
+    const fieldsToCheck = ['email', 'fullName', 'idNumber', 'phoneNumber'].filter(
+      field => formData[field as keyof typeof formData]
+    );
+    
+    // Add RFID UID to fields to check if it's not empty
+    if (formData.rfid_uid) {
+      fieldsToCheck.push('rfid_uid');
+    }
+    
+    // Create queries for each field that needs checking
+    const duplicateChecks = fieldsToCheck.map(async (field) => {
+      const fieldValue = formData[field as keyof typeof formData];
+      if (!fieldValue) return null;
+      
+      const fieldQuery = query(
+        collection(db, 'student'),
+        where(field, '==', fieldValue),
+      );
+      
+      const querySnapshot = await getDocs(fieldQuery);
+      
+      if (!querySnapshot.empty) {
+        return { field, value: fieldValue };
+      }
+      return null;
+    });
+    
+    // Wait for all duplicate checks to complete
+    const results = await Promise.all(duplicateChecks);
+    const foundDuplicates = results.filter(result => result !== null);
+    
+    if (foundDuplicates.length > 0) {
+      const fieldNameMap = {
+        'fullName': 'Full Name',
+        'idNumber': 'ID Number',
+        'phoneNumber': 'Phone Number',
+        'email': 'Email',
+        'rfid_uid': 'RFID UID'  // Add RFID UID to the field name map
+      };
+      
+      const duplicateFieldNames = foundDuplicates
+        .map(d => fieldNameMap[d?.field as keyof typeof fieldNameMap] || d?.field)
+        .join(', ');
+      
+      showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFieldNames}. Please use different values.`);
+      setIsLoading(false);
+      return;
+    }
+    
+    // If no duplicates found, proceed with creating the user
+    await addDoc(collection(db, 'student'), {
+      email: formData.email,
+      fullName: formData.fullName,
+      userType: formData.userType,
+      rfid_uid: formData.rfid_uid || '',
+      program: formData.program || '',
+      status: formData.status || 'UNAVAILABLE',
+      numOnQueue: formData.numOnQueue || 0,
+      phoneNumber: formData.phoneNumber || '',
+      idNumber: formData.idNumber || '',
+      isVerified: true,
+      createdAt: new Date(),
+      userTicketNumber: formData.userTicketNumber || '',
+      archived: false
+    });
+    
+    showAlert('Success', 'User created successfully!');
+    setCreateModalVisible(false);
+    setFormData({});
+  } catch (error) {
+    console.error('Error creating user:', error);
+    showAlert('Error', 'Failed to create user. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   // Handle input change
   const handleInputChange = (field: string, value: string | number | boolean) => {

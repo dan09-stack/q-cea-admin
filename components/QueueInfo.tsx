@@ -128,7 +128,7 @@ const QueueInfo: React.FC<QueueInfoProps> = ({
           <View style={styles.queueCountContainer}>
             <Text style={styles.queueTitle}>TOTAL</Text>
             <Text style={styles.queueTitle}>WAITING STUDENT </Text>
-            <Text style={styles.queueCount}>{queueCount}</Text> {/* Display the queueCount */}
+            <Text style={styles.queueCount}>{queueCount}</Text> 
 
             <View style={styles.headerButtonsContainer}>
               <TouchableOpacity

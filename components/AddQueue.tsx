@@ -644,7 +644,7 @@ useEffect(() => {
                       );
                       const facultyQuery = query(
                         collection(db, 'student'),
-                        where('fullName', '==', selectedFaculty),
+                        where('fullName', '==', facultyData.faculty),
                         where('userType', '==', 'FACULTY')
                       );
                       

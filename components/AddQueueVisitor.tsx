@@ -59,7 +59,6 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
     return () => unsubscribe();
   }, []);
 
-  // Fetch concerns list
 // Fetch concerns list
 useEffect(() => {
   // Fetch concerns from Firestore
@@ -82,94 +81,104 @@ useEffect(() => {
 }, []);
 
 
-  const handleSubmit = async () => {
-    if (!visitorName.trim()) {
-      showAlert("Please enter your name");
-      return;
+const handleSubmit = async () => {
+  if (!visitorName.trim()) {
+    showAlert("Please enter your name");
+    return;
+  }
+  
+  if (!selectedFacultyId) {
+    showAlert("Please select a faculty member");
+    return;
+  }
+  
+  if (!selectedConcern && !otherConcern) {
+    showAlert("Please select or specify your concern");
+    return;
+  }
+
+  setIsLoading(true);
+  try {
+    // Check if visitor with same name already exists
+    const visitorQuery = query(
+      collection(db, 'student'),
+      where('fullName', '==', visitorName.trim()),
+      where('userType', '==', 'VISITOR')
+    );
+    
+    const visitorSnapshot = await getDocs(visitorQuery);
+    
+    // Get queue position for waiting visitors for this faculty
+    const queueQuery = query(
+      collection(db, 'student'),
+      where('faculty', '==', selectedFacultyName),
+      where('status', '==', 'waiting')
+    );
+    
+    const queueSnapshot = await getDocs(queueQuery);
+    const queuePosition = queueSnapshot.size + 1;
+
+    // Get next ticket number
+    const ticketRef = doc(db, 'ticketNumberCounter', 'ticket');
+    const ticketSnap = await getDoc(ticketRef);
+    
+    let newNumber = 1;
+    
+    if (ticketSnap.exists()) {
+      const currentNumber = ticketSnap.data().ticketNum || 0;
+      newNumber = currentNumber + 1;
+
+      // Update the ticket counter
+      await updateDoc(ticketRef, {
+        ticketNum: newNumber
+      });
+    } else {
+      // If the ticket counter document doesn't exist, create it
+      await setDoc(doc(db, 'ticketNumberCounter', 'ticket'), {
+        ticketNum: 1
+      });
     }
     
-    if (!selectedFacultyId) {
-      showAlert("Please select a faculty member");
-      return;
-    }
+    const visitorData = {
+      fullName: visitorName,
+      faculty: selectedFacultyName,
+      concern: selectedConcern === "Other" ? otherConcern : selectedConcern,
+      otherConcern: selectedConcern === "Other" ? otherConcern : "",
+      requestDate: new Date(),
+      status: 'waiting',
+      queuePosition: queuePosition,
+      userTicketNumber: newNumber,
+      specificDetails: specificDetails,
+      program: "VST",
+      userType: "VISITOR",
+    };
     
-    if (!selectedConcern && !otherConcern) {
-      showAlert("Please select or specify your concern");
-      return;
+    // If visitor exists, update their record, otherwise create a new one
+    if (!visitorSnapshot.empty) {
+      // Visitor exists, update their record
+      const visitorDoc = visitorSnapshot.docs[0];
+      await updateDoc(doc(db, 'student', visitorDoc.id), visitorData);
+    } else {
+      // Create a new visitor record
+      await addDoc(collection(db, 'student'), visitorData);
     }
-  
-    setIsLoading(true);
-    try {
-      // Get queue position for waiting visitors for this faculty
-      const queueQuery = query(
-        collection(db, 'student'),
-        where('faculty', '==', selectedFacultyName),
-        where('status', '==', 'waiting')
-      );
-      
-      const queueSnapshot = await getDocs(queueQuery);
-      const queuePosition = queueSnapshot.size + 1;
-  
-      // Get next ticket number
-      const ticketRef = doc(db, 'ticketNumberCounter', 'ticket');
-      const ticketSnap = await getDoc(ticketRef);
-  
-      if (ticketSnap.exists()) {
-        const currentNumber = ticketSnap.data().ticketNum || 0;
-        const newNumber = currentNumber + 1;
-  
-        // Update the ticket counter with the same field name as read
-        await updateDoc(ticketRef, {
-          ticketNum: newNumber
-        });
-  
-        // Create a new visitor queue entry
-        await addDoc(collection(db, 'student'), {
-          fullName: visitorName,
-          faculty: selectedFacultyName, // Use the faculty name here
-          concern: selectedConcern === "Other" ? otherConcern : selectedConcern,
-          otherConcern: selectedConcern === "Other" ? otherConcern : "",
-          requestDate: new Date(),
-          status: 'waiting',
-          queuePosition: queuePosition,
-          userTicketNumber: newNumber,
-          specificDetails: specificDetails,
-          program: "VST",
-          userType: "STUDENT",
-        });
-  
-        // Update faculty's queue count directly by ID
-        await updateDoc(doc(db, 'student', selectedFacultyId), {
-          numOnQueue: increment(1)
-        });
-  
-        setTicketNumber(newNumber.toString());
-        showAlert(`Queue ticket created successfully. Your ticket number is ${newNumber} and your position in queue is ${queuePosition}.`);
-        onClose(); // Close the form after successful submission
-      } else {
-        // If the ticket counter document doesn't exist, create it
-        await setDoc(doc(db, 'ticketNumberCounter', 'ticket'), {
-          ticketNum: 1
-        });
-        
-        
-        
-        // Update faculty's queue count
-        await updateDoc(doc(db, 'student', selectedFacultyId), {
-          numOnQueue: increment(1)
-        });
-        
-        setTicketNumber("1");
-        showAlert(`Queue ticket created successfully. Your ticket number is 1 and your position in queue is ${queuePosition}.`);
-        onClose();
-      }
-    } catch (error) {
-      console.error('Error adding to queue:', error);
-      showAlert('Failed to join queue. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+    // Update faculty's queue count directly by ID
+    await updateDoc(doc(db, 'student', selectedFacultyId), {
+      numOnQueue: increment(1)
+    });
+
+    setTicketNumber(newNumber.toString());
+    showAlert(`Queue ticket created successfully. Your ticket number is ${newNumber} and your position in queue is ${queuePosition}.`);
+    onClose(); // Close the form after successful submission
+  } catch (error) {
+    console.error('Error adding to queue:', error);
+    showAlert('Failed to join queue. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
   
   const handleFacultyChange = (itemValue: string) => {
     setSelectedFacultyId(itemValue);
