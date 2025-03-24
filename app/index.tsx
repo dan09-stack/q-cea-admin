@@ -22,7 +22,7 @@ import { sendSMS } from './services/smsService';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const INITIAL_LOCKOUT_DURATION = 5 * 1000; // 5 seconds in milliseconds (for testing)
-const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+const SESSION_TIMEOUT = 480 * 60 * 1000; //8hrs
 const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 const Index = () => {
