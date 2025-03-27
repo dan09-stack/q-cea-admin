@@ -153,33 +153,69 @@ const List: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-    if (!selectedUser) return;
-    
+    console.log("🔍 Selected user before deletion:", selectedUser);
+  
+    // Validate if selectedUser and email exist
+    if (!selectedUser || !selectedUser.email) {
+      console.error("❌ Error: No email found for selected user", selectedUser);
+      showAlert("Error", "User email is missing. Cannot delete.");
+      return;
+    }
+  
+    // Log the email to be deleted
+    console.log("✅ Deleting user with email:", selectedUser.email);
+    console.log("📤 Sending request to deleteAuthUser with:", JSON.stringify({ email: selectedUser.email }));
+  
     try {
-      // Delete from Firestore
-      await deleteDoc(doc(db, 'student', selectedUser.id));
-      
-      // Call a backend function to delete the user from Authentication
-      if (selectedUser.email) {
-        try {
-          // This assumes you've created a Cloud Function named 'deleteAuthUser'
-          const deleteAuthUser = httpsCallable(getFunctions(), 'deleteAuthUser');
-          await deleteAuthUser({ email: selectedUser.email });
-        } catch (authError: any) {
-          console.error('Error deleting user from authentication:', authError);
-          // Continue with success message even if auth deletion fails
-        }
+      const userEmail = selectedUser.email.trim(); // Ensure it's a valid string
+      if (!userEmail) {
+        console.error("❌ Error: Invalid email format", selectedUser.email);
+        showAlert("Error", "Invalid email format.");
+        return;
       }
-      
-      showAlert('Success', 'User deleted successfully!');
+  
+      console.log("📤 Calling deleteAuthUser with email:", { email: userEmail });
+  
+      // Define the expected result structure
+      interface DeleteAuthUserResponse {
+        success: boolean;
+        message?: string; // Optional message to handle error messages from Firebase Functions
+      }
+  
+      // Firebase Functions: Call the deleteAuthUser function with proper typing
+      const functions = getFunctions();
+      const deleteAuthUser = httpsCallable<{ email: string }, DeleteAuthUserResponse>(functions, "deleteAuthUser");
+  
+      console.log("🔄 Sending delete request to Firebase Functions...");
+      // Corrected the way the email is passed to Firebase Functions
+      const result = await deleteAuthUser({ email: userEmail }); // Pass email directly, not nested in 'data'
+  
+      console.log("📩 Response from deleteAuthUser:", result.data);
+  
+      if (result.data?.success) {
+        console.log("✅ Firebase Auth user deleted successfully!");
+  
+        // Delete the user from Firestore if Auth deletion is successful
+        console.log("🗑️ Deleting user from Firestore with ID:", selectedUser.id);
+        await deleteDoc(doc(db, "student", selectedUser.id));
+        console.log("🗑️ User deleted from Firestore:", selectedUser.id);
+  
+        showAlert("Success", "User deleted successfully!");
+      } else {
+        console.warn("⚠️ Warning: Firebase Auth deletion failed!", result.data?.message || "Unknown error");
+        showAlert("Warning", result.data?.message || "User deleted from Firestore, but authentication deletion failed.");
+      }
+  
+      // Close modal after deletion attempt
       setDeleteModalVisible(false);
-    } catch (error: any) {
-      console.error('Error deleting user:', error);
-      showAlert('Error', 'Failed to delete user. Please try again.');
+      console.log("🔒 Modal closed after deletion.");
+    } catch (error) {
+      // Log and display any errors that occur during the deletion process
+      console.error("❌ Error deleting user:", error);
+      showAlert("Error", "Failed to delete user. Please try again.");
     }
   };
-
-  // Save edited user with duplicate checking
+  
  // Save edited user with duplicate checking
 const saveUser = async () => {
   if (!selectedUser || !formData) return;

@@ -1,23 +1,44 @@
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+const cors = require('cors');
+
+// Initialize Firebase Admin SDK
 admin.initializeApp();
 
-exports.deleteAuthUser = functions.https.onCall(async (data, context) => {
-  try {
-    const email = data.email;
-    if (!email) {
-      throw new Error("Email is required");
+// Allow all origins and include specific headers (like Authorization)
+const corsHandler = cors({
+  origin: true,  // Allow all origins
+  allowedHeaders: ['Content-Type', 'Authorization'],  // Allow 'Authorization' header
+});
+
+exports.deleteAuthUser = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    console.log("Received request:", req.body);
+
+    if (req.method !== "POST") {
+      console.error("Invalid method:", req.method);
+      return res.status(405).send({ error: "Method Not Allowed" });
     }
 
-    // Find the user by email
-    const userRecord = await admin.auth().getUserByEmail(email);
+    const { email } = req.body.data || {};  // Safely accessing email within 'data'
 
-    // Delete the user
-    await admin.auth().deleteUser(userRecord.uid);
+    if (!email) {
+      console.error("No email provided");
+      return res.status(400).json({ error: "Email is required" });
+    }
 
-    return {success: true, message: "User deleted successfully"};
-  } catch (error) {
-    console.error("Error deleting user:", error);
-    throw new functions.https.HttpsError("internal", error.message);
-  }
+    try {
+      console.log(`Fetching user by email: ${email}`);
+      const user = await admin.auth().getUserByEmail(email);
+      console.log(`User found: ${user.uid}`);
+
+      await admin.auth().deleteUser(user.uid);
+      console.log(`User ${email} deleted successfully`);
+
+      return res.json({ success: true, message: `User ${email} deleted` });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      return res.status(500).json({ error: error.message });
+    }
+  });
 });
