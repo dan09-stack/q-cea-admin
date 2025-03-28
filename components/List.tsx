@@ -188,8 +188,12 @@ const List: React.FC = () => {
       if (selectedUser.email) {
         try {
           // Use the callable function to delete the auth user
-          const deleteAuthUser = httpsCallable(functions, 'deleteuser');
-          await deleteAuthUser({ email: selectedUser.email });
+          const functions = getFunctions();
+      const deleteAuthUser = httpsCallable<{ email: string }, DeleteAuthUserResponse>(functions, "deleteAuthUser");
+  
+      console.log("🔄 Sending delete request to Firebase Functions...");
+      // Corrected the way the email is passed to Firebase Functions
+      const result = await deleteAuthUser({ email: selectedUser.email });
           console.log('User authentication deleted successfully');
         } catch (authError: any) {
           console.error('Error deleting user from authentication:', authError);
@@ -198,7 +202,7 @@ const List: React.FC = () => {
       }
       
       // Then delete the user document from Firestore
-      await deleteDoc(doc(db, 'student', selectedUser.id));
+      await deleteDoc(doc(db, 'student', selectedUser.email));
       
       showAlert('Success', 'User deleted successfully!');
       setDeleteModalVisible(false);
