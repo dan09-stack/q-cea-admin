@@ -175,7 +175,7 @@ const Index = () => {
       setErrorMessage('');
   
       const result = await verifyAdminCredentials(email, password);
-      if (email != 'q.cea2024@gmail.com') {
+      if (email != 'albisdandan@gmail.com') {
         setErrorMessage('Invalid email or password');
         return;
       }

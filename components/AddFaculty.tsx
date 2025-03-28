@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,16 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  Modal,
+  FlatList,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebaseConfig";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
 import { useAppTheme } from '../utils/theme';
 import { collection, query, where, getDocs } from "firebase/firestore";
 import Icon from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AddFacultyProps {
   onClose: () => void;
@@ -31,6 +33,18 @@ interface FacultyFormData {
   rfid_uid: string;
 }
 
+// Create a default form data object
+const defaultFormData: FacultyFormData = {
+  fullName: "",
+  idNumber: "",
+  program: "",
+  phoneNumber: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  rfid_uid: "",
+};
+
 const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
   const { 
     colors, 
@@ -42,27 +56,59 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
   } = useAppTheme();
   
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<FacultyFormData>({
-    fullName: "",
-    idNumber: "",
-    program: "",
-    phoneNumber: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    rfid_uid: "",
-  });
+  const [formData, setFormData] = useState<FacultyFormData>(defaultFormData);
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [existingPrograms, setExistingPrograms] = useState<string[]>([]);
   
   const [errors, setErrors] = useState({
     fullName: "",
     idNumber: "",
     phoneNumber: "",
     email: "",
-    password: ""
+    password: "",
+    program: ""
   });
+  
+  // Load saved form data when component mounts
+  useEffect(() => {
+    const loadSavedFormData = async () => {
+      try {
+        const savedFormData = await AsyncStorage.getItem('addFacultyFormData');
+        if (savedFormData) {
+          setFormData(JSON.parse(savedFormData));
+        }
+      } catch (error) {
+        console.error('Error loading saved form data:', error);
+      }
+    };
+    
+    loadSavedFormData();
+  }, []);
+  
+  // Save form data whenever it changes
+  useEffect(() => {
+    const saveFormData = async () => {
+      try {
+        await AsyncStorage.setItem('addFacultyFormData', JSON.stringify(formData));
+      } catch (error) {
+        console.error('Error saving form data:', error);
+      }
+    };
+    
+    saveFormData();
+  }, [formData]);
+  
+  // Clear saved form data after successful submission
+  const clearSavedFormData = async () => {
+    try {
+      await AsyncStorage.removeItem('addFacultyFormData');
+    } catch (error) {
+      console.error('Error clearing saved form data:', error);
+    }
+  };
   
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
@@ -86,8 +132,35 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     { label: "Program Head-Electrical Engineering", value: "PH-EE" },
     { label: "Program Head-Electronics Engineering", value: "PH-ECE" },
     { label: "Program Head-Mechanical Engineering", value: "PH-ME" },
+    { label: "Dean", value: "DEAN" },
   ];
 
+  // Fetch existing program heads and dean
+  useEffect(() => {
+    const fetchExistingPrograms = async () => {
+      try {
+        const studentCollection = collection(db, 'student');
+        const programHeadQuery = query(studentCollection, where('userType', '==', 'FACULTY'));
+        const snapshot = await getDocs(programHeadQuery);
+        
+        const existingProgramsList: string[] = [];
+        snapshot.forEach(doc => {
+          const program = doc.data().program;
+          if (program && (program.startsWith('PH-') || program === 'DEAN')) {
+            existingProgramsList.push(program);
+          }
+        });
+        
+        setExistingPrograms(existingProgramsList);
+      } catch (error) {
+        console.error("Error fetching existing program heads:", error);
+      }
+    };
+    
+    fetchExistingPrograms();
+  }, []);
+
+  // Rest of the validation functions remain the same...
   const validatePhoneNumber = (phoneNumber: string): boolean => {
     const phoneRegex = /^(09\d{9}|\+63\d{10})$/;
     return phoneRegex.test(phoneNumber);
@@ -159,6 +232,22 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     return password === confirmPassword;
   };
 
+  const validateProgram = (program: string): { isValid: boolean; message: string } => {
+    if (!program) {
+      return { isValid: false, message: "Please select a program" };
+    }
+    
+    // Check if the selected program is a program head or dean position
+    if ((program.startsWith('PH-') || program === 'DEAN') && existingPrograms.includes(program)) {
+      return { 
+        isValid: false, 
+        message: `A faculty member with the role ${program} already exists` 
+      };
+    }
+    
+    return { isValid: true, message: "" };
+  };
+
   const validateForm = () => {
     let isValid = true;
     const newErrors = {
@@ -166,7 +255,8 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
       idNumber: "",
       phoneNumber: "",
       email: "",
-      password: ""
+      password: "",
+      program: ""
     };
 
     // Check if all fields are filled
@@ -199,6 +289,13 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     // Validate email format
     if (!validateEmail(formData.email)) {
       newErrors.email = "Please enter a valid email address";
+      isValid = false;
+    }
+    
+    // Validate program selection
+    const programValidation = validateProgram(formData.program);
+    if (!programValidation.isValid) {
+      newErrors.program = programValidation.message;
       isValid = false;
     }
     
@@ -304,6 +401,10 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         });
         await sendEmailVerification(user);
   
+        // Clear the form data after successful submission
+        await clearSavedFormData();
+        setFormData(defaultFormData);
+        
         showAlert("Success", "Faculty member added successfully");
         onClose();
       } catch (error: any) {
@@ -316,6 +417,30 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         setIsLoading(false);
       }
     }
+  };
+
+  const handleSelectProgram = (program: string) => {
+    // Validate if the program is already taken (for program heads and dean)
+    if ((program.startsWith('PH-') || program === 'DEAN') && existingPrograms.includes(program)) {
+      setErrors({
+        ...errors,
+        program: `A faculty member with the role ${program} already exists`
+      });
+    } else {
+      setErrors({
+        ...errors,
+        program: ""
+      });
+    }
+    
+    setFormData({...formData, program});
+    setShowProgramModal(false);
+  };
+
+  // Handle cancel button with confirmation
+  const handleCancel = () => {
+    // Don't clear the form data when canceling, just close the form
+    onClose();
   };
   
   return (
@@ -377,21 +502,23 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
 
         <View style={styles.inputContainer}>
           <Text style={getTextStyle(styles.inputLabel)}>Program</Text>
-          <View style={[getInputStyle(styles.pickerContainer), styles.whiteBackground]}>
-            <Picker
-              selectedValue={formData.program}
-              onValueChange={(itemValue) => setFormData({...formData, program: itemValue})}
-              style={[styles.picker, { color: colors.text }]}
-            >
-              {programs.map((program, index) => (
-                <Picker.Item 
-                  key={index}
-                  label={program.label}
-                  value={program.value}
-                />
-              ))}
-            </Picker>
-          </View>
+          <TouchableOpacity 
+            style={[
+              getInputStyle(styles.input), 
+              styles.whiteBackground, 
+              styles.programSelector,
+              errors.program ? styles.inputError : null
+            ]}
+            onPress={() => setShowProgramModal(true)}
+          >
+            <Text style={formData.program ? styles.programText : styles.placeholderText}>
+              {formData.program 
+                ? programs.find(p => p.value === formData.program)?.label || "Select Program" 
+                : "Select Program"}
+            </Text>
+            <Icon name="chevron-down-outline" size={20} color="#666" />
+          </TouchableOpacity>
+          {errors.program ? <Text style={styles.errorText}>{errors.program}</Text> : null}
         </View>
 
         <View style={styles.inputContainer}>
@@ -504,7 +631,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={getButtonStyle(styles.cancelButton, true)} 
-            onPress={onClose}
+            onPress={handleCancel}
           >
             <Text style={styles.buttonText}>CANCEL</Text>
           </TouchableOpacity>
@@ -517,6 +644,57 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Program Selection Modal */}
+      <Modal
+        visible={showProgramModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowProgramModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Program</Text>
+              <TouchableOpacity onPress={() => setShowProgramModal(false)}>
+                <Icon name="close-outline" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <FlatList
+              data={programs.filter(p => p.value !== "")} // Remove the "Select Program" option
+              keyExtractor={(item) => item.value}
+              renderItem={({ item }) => {
+                const isDisabled = (item.value.startsWith('PH-') || item.value === 'DEAN') && 
+                                  existingPrograms.includes(item.value);
+                
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.programItem,
+                      isDisabled && styles.disabledProgramItem
+                    ]}
+                    onPress={() => handleSelectProgram(item.value)}
+                    disabled={isDisabled}
+                  >
+                    <Text style={[
+                      styles.programItemText,
+                      isDisabled && styles.disabledProgramItemText
+                    ]}>
+                      {item.label}
+                    </Text>
+                    {isDisabled && (
+                      <Text style={styles.programTakenText}>
+                        (Already assigned)
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -525,7 +703,7 @@ const styles = StyleSheet.create({
   outerContainer: {
     margin: 20,
     width: "70%",
-    height: "78%", // Set a specific height to ensure scrolling works
+    height: 700, // Set a specific height to ensure scrolling works
     padding: 30,
     borderRadius: 15, 
     borderWidth: 1,
@@ -608,18 +786,19 @@ const styles = StyleSheet.create({
   whiteBackground: {
     backgroundColor: "white",
   },
-  pickerContainer: {
-    width: "100%",
-    height: 50,
-    borderRadius: 5,
-    justifyContent: "center",
-    overflow: "hidden",
+  programSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: 15,
   },
-  picker: {
-    width: "100%",
+  programText: {
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    color: '#000',
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#999',
   },
   buttonContainer: {
     flexDirection: "row",
@@ -645,6 +824,61 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '60%',
+    maxHeight: '70%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#800020',
+  },
+  programItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  programItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  disabledProgramItem: {
+    backgroundColor: '#f5f5f5',
+  },
+  disabledProgramItemText: {
+    color: '#999',
+  },
+  programTakenText: {
+    fontSize: 12,
+    color: 'red',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
 });
 

@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity, Platform, ScrollView } from "react-native";
-import { Picker } from '@react-native-picker/picker';
+import { View, Text, TextInput, StyleSheet, Button, ActivityIndicator, Alert, TouchableOpacity, Platform, ScrollView, Modal } from "react-native";
 import { auth, db } from '@/firebaseConfig';
 import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, onSnapshot, updateDoc, QueryConstraint,
   WhereFilterOp, 
   orderBy,
-  
   limit,
   writeBatch,
   query,
@@ -21,11 +19,11 @@ interface AddQueueProps {
   setShowTicketOverview: React.Dispatch<React.SetStateAction<boolean>>;
 } 
 
-  const AddQueue: React.FC<AddQueueProps> = ({ 
-    onClose, 
-    showTicketOverview, 
-    setShowTicketOverview 
-  }) => {
+const AddQueue: React.FC<AddQueueProps> = ({ 
+  onClose, 
+  showTicketOverview, 
+  setShowTicketOverview 
+}) => {
   const [showPriorityModal, setShowPriorityModal] = useState(false);
   const [priorityName, setPriorityName] = useState('');
   const [priorityId, setPriorityId] = useState('');
@@ -35,7 +33,7 @@ interface AddQueueProps {
   const [isRequested, setIsRequested] = useState(false);
   const [ticketNumber, setTicketNumber] = useState('');
   const [userTicketNumber, setUserTicketNumber] = useState('');
-  const [facultyList, setFacultyList] = useState<Array<{id: string, fullName: string, status: string}>>([]);
+  const [facultyList, setFacultyList] = useState<Array<{id: string, fullName: string, status: string, numOnQueue?: number}>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingRequest, setIsCheckingRequest] = useState(true);
   const [studentsList, setStudentsList] = useState<Array<{id: string, fullName: string}>>([]);
@@ -47,8 +45,14 @@ interface AddQueueProps {
   const [currentDisplayedTicket, setCurrentDisplayedTicket] = useState('');
   const [currentDisplayedProgram, setCurrentDisplayedProgram] = useState('');
   const [userProgram, setUserProgram] = useState('');
-  // ticket overview list
-
+  const [specificDetails, setSpecificDetails] = useState("");
+  
+  // Modal visibility states
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [showFacultyModal, setShowFacultyModal] = useState(false);
+  const [showConcernModal, setShowConcernModal] = useState(false);
+  
+  // All faculty tickets state
   const [allFacultyTickets, setAllFacultyTickets] = useState<Array<{
     faculty: string,
     tickets: Array<{
@@ -58,73 +62,74 @@ interface AddQueueProps {
       status: string
     }>
   }>>([]);
-  const [specificDetails, setSpecificDetails] = useState("");
-const showAlert = (message: string) => {
-  if (Platform.OS === 'web') {
-    window.alert(message);
-  } else {
-    Alert.alert(message);
-  }
-};
-// ticket queue postions display
-useEffect(() => {
-  if (!selectedStudent) return;
 
-  const studentRef = doc(db, 'student', selectedStudent);
-  const unsubscribe = onSnapshot(studentRef, (doc) => {
-    if (doc.exists()) {
-      const studentData = doc.data();
-      const studentFaculty = studentData.faculty;
-
-      if (studentFaculty) {
-        // Get current displayed ticket from faculty
-        const facultyQuery = firestoreQuery(
-          collection(db, 'student'),
-          firestoreWhere('userType', '==', 'FACULTY'),
-          firestoreWhere('fullName', '==', studentFaculty)
-        );
-
-        onSnapshot(facultyQuery, async (snapshot) => {
-          if (!snapshot.empty) {
-            const facultyData = snapshot.docs[0].data();
-            const displayedTicket = facultyData.displayedTicket;
-        
-            // Get current ticket's program
-            const currentTicketQuery = firestoreQuery(
-              collection(db, 'student'),
-              firestoreWhere('userTicketNumber', '==', displayedTicket)
-            );
-            const currentTicketSnapshot = await getDocs(currentTicketQuery);
-            if (!currentTicketSnapshot.empty) {
-              setCurrentDisplayedProgram(currentTicketSnapshot.docs[0].data().program);
-            }
-            setCurrentDisplayedTicket(displayedTicket || '');
-            
-            // Get next ticket
-            const nextTicketQuery = firestoreQuery(
-              collection(db, 'student'),
-              firestoreWhere('faculty', '==', studentFaculty),
-              firestoreWhere('status', '==', 'waiting'),
-              firestoreWhere('userTicketNumber', '>', facultyData.displayedTicket),
-              orderBy('userTicketNumber', 'asc'),
-              limit(1)
-            );
-
-            onSnapshot(nextTicketQuery, (nextSnapshot) => {
-              if (!nextSnapshot.empty) {
-                const nextTicket = nextSnapshot.docs[0].data();
-                setNextDisplayedTicket(nextTicket.userTicketNumber);
-                setNextDisplayedProgram(nextTicket.program);
-              }
-            });
-          }
-        });
-      }
+  const showAlert = (message: string) => {
+    if (Platform.OS === 'web') {
+      window.alert(message);
+    } else {
+      Alert.alert(message);
     }
-  });
+  };
 
-  return () => unsubscribe();
-}, [selectedStudent]);
+  // ticket queue positions display
+  useEffect(() => {
+    if (!selectedStudent) return;
+
+    const studentRef = doc(db, 'student', selectedStudent);
+    const unsubscribe = onSnapshot(studentRef, (doc) => {
+      if (doc.exists()) {
+        const studentData = doc.data();
+        const studentFaculty = studentData.faculty;
+
+        if (studentFaculty) {
+          // Get current displayed ticket from faculty
+          const facultyQuery = firestoreQuery(
+            collection(db, 'student'),
+            firestoreWhere('userType', '==', 'FACULTY'),
+            firestoreWhere('fullName', '==', studentFaculty)
+          );
+
+          onSnapshot(facultyQuery, async (snapshot) => {
+            if (!snapshot.empty) {
+              const facultyData = snapshot.docs[0].data();
+              const displayedTicket = facultyData.displayedTicket;
+          
+              // Get current ticket's program
+              const currentTicketQuery = firestoreQuery(
+                collection(db, 'student'),
+                firestoreWhere('userTicketNumber', '==', displayedTicket)
+              );
+              const currentTicketSnapshot = await getDocs(currentTicketQuery);
+              if (!currentTicketSnapshot.empty) {
+                setCurrentDisplayedProgram(currentTicketSnapshot.docs[0].data().program);
+              }
+              setCurrentDisplayedTicket(displayedTicket || '');
+              
+              // Get next ticket
+              const nextTicketQuery = firestoreQuery(
+                collection(db, 'student'),
+                firestoreWhere('faculty', '==', studentFaculty),
+                firestoreWhere('status', '==', 'waiting'),
+                firestoreWhere('userTicketNumber', '>', facultyData.displayedTicket),
+                orderBy('userTicketNumber', 'asc'),
+                limit(1)
+              );
+
+              onSnapshot(nextTicketQuery, (nextSnapshot) => {
+                if (!nextSnapshot.empty) {
+                  const nextTicket = nextSnapshot.docs[0].data();
+                  setNextDisplayedTicket(nextTicket.userTicketNumber);
+                  setNextDisplayedProgram(nextTicket.program);
+                }
+              });
+            }
+          });
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedStudent]);
   
   useEffect(() => {
     // Get user program
@@ -163,7 +168,8 @@ useEffect(() => {
       const faculty = snapshot.docs.map((doc) => ({
         id: doc.id,
         fullName: doc.data().fullName || '',
-        status: doc.data().status || 'UNAVAILABLE'
+        status: doc.data().status || 'UNAVAILABLE',
+        numOnQueue: doc.data().numOnQueue || 0 
       }));
       setFacultyList(faculty);
     });
@@ -211,7 +217,7 @@ useEffect(() => {
       setIsCheckingRequest(false);
     }
   
-  }, [selectedStudent]); // Add selectedStudent as a dependency
+  }, [selectedStudent]);
 
   useEffect(() => {
     if (!selectedStudent) return;
@@ -240,6 +246,7 @@ useEffect(() => {
   
     return () => unsubscribe();
   }, [selectedStudent, currentDisplayedTicket, userTicketNumber]);
+
   // Add this function to check if current time is after hours
   const isAfterHours = (): boolean => {
     const now = new Date();
@@ -292,27 +299,9 @@ useEffect(() => {
       }
     }
   };
-  
-  // Add this useEffect to check time periodically
-  // useEffect(() => {
-  //   // Check immediately when component mounts
-  //   checkAndCancelAfterHoursQueues();
-    
-  //   // Set up interval to check every minute
-  //   const intervalId = setInterval(checkAndCancelAfterHoursQueues, 60000);
-    
-  //   // Clean up interval on component unmount
-  //   return () => clearInterval(intervalId);
-  // }, []);
-
 
   const handleCancelAllQueues = async () => {
     try {
-      // Confirm cancellation first
-      // if (!confirm('Are you sure you want to cancel ALL queues? This action cannot be undone.')) {
-      //   return;
-      // }
-      
       // Get all waiting students in queues
       const studentsCollectionRef = collection(db, 'student');
       const waitingStudentsQuery = firestoreQuery(
@@ -340,7 +329,6 @@ useEffect(() => {
           batch.update(studentRef, {
             status: 'completed',
             userTicketNumber: null,
-            
             faculty: null,
             concern: null,
             otherConcern: null,
@@ -369,8 +357,6 @@ useEffect(() => {
       Alert.alert('Error', 'Failed to cancel all queues');
     }
   };
-  
-  
   
   const handleRequest = async () => {
     console.log("Request initiated with faculty: ", selectedFaculty, " and concern: ", selectedConcern, " other concern: ", otherConcern);
@@ -432,7 +418,8 @@ useEffect(() => {
           otherConcern: otherConcern,
           requestDate: new Date(),
           status: 'waiting',
-          queuePosition: queuePosition
+          queuePosition: queuePosition,
+          specificDetails: specificDetails
         });
   
         const facultyQuery = query(
@@ -507,7 +494,8 @@ useEffect(() => {
             concern: null,
             otherConcern: null,
             requestDate: null,
-            queuePosition: null
+            queuePosition: null,
+            specificDetails: null
           });
   
           setIsRequested(false);
@@ -515,6 +503,7 @@ useEffect(() => {
           setSelectedConcern('');
           setOtherConcern('');
           setUserTicketNumber('');
+          setSpecificDetails('');
   
           Alert.alert('Success', 'Queue cancelled successfully');
         } else {
@@ -535,13 +524,13 @@ useEffect(() => {
       setSelectedFaculty('');
       setSelectedConcern('');
       setOtherConcern('');
+      setSpecificDetails('');
     } catch (error) {
       console.error('Error adding more queue:', error);
       Alert.alert('Error', 'Failed to add more queue');
     }
   };
 
-  
   const handleCancel = () => {
     console.log("Cancel button pressed, closing the modal.");
     onClose(); // Close the modal by calling the onClose function passed via props
@@ -590,6 +579,148 @@ useEffect(() => {
   
     return () => unsubscribe();
   }, []);
+
+  // Student Selection Modal Component
+  const StudentSelectionModal = () => (
+    <Modal
+      visible={showStudentModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowStudentModal(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Student</Text>
+          <ScrollView style={styles.modalScrollView}>
+            {studentsList
+              .sort((a, b) => a.fullName.localeCompare(b.fullName))
+              .map((student) => (
+                <TouchableOpacity
+                  key={student.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedStudent(student.id);
+                    setShowStudentModal(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.modalItemText,
+                    selectedStudent === student.id && styles.selectedModalItem
+                  ]}>
+                    {student.fullName}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => setShowStudentModal(false)}
+          >
+            <Text style={styles.modalCloseButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Faculty Selection Modal Component
+  const FacultySelectionModal = () => (
+    <Modal
+      visible={showFacultyModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowFacultyModal(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Faculty</Text>
+          <ScrollView style={styles.modalScrollView}>
+            {facultyList
+              .sort((a, b) => a.fullName.localeCompare(b.fullName))
+              .map((faculty) => (
+                <TouchableOpacity
+                  key={faculty.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedFaculty(faculty.fullName);
+                    setShowFacultyModal(false);
+                  }}
+                >
+                  <View style={styles.facultyItemRow}>
+                    <Text style={[
+                      styles.modalItemText,
+                      selectedFaculty === faculty.fullName && styles.selectedModalItem
+                    ]}>
+                      {faculty.fullName} 
+                      { `(Queue: ${faculty.numOnQueue})`}
+                    </Text>
+                    <Text style={[
+                      styles.statusText,
+                      { color: faculty.status === 'AVAILABLE' ? '#4CAF50' : '#FF5252' }
+                    ]}>
+                      {faculty.status}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => setShowFacultyModal(false)}
+          >
+            <Text style={styles.modalCloseButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+  
+  
+
+  // Concern Selection Modal Component
+  const ConcernSelectionModal = () => (
+    <Modal
+      visible={showConcernModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowConcernModal(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select Concern</Text>
+          <ScrollView style={styles.modalScrollView}>
+            {concernsList.length > 0 ? (
+              concernsList.map((concern, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedConcern(concern);
+                    setShowConcernModal(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.modalItemText,
+                    selectedConcern === concern && styles.selectedModalItem
+                  ]}>
+                    {concern}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noItemsText}>No concerns available</Text>
+            )}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => setShowConcernModal(false)}
+          >
+            <Text style={styles.modalCloseButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const TicketOverview = () => (
     <View style={styles.overviewContainer}>
@@ -696,8 +827,19 @@ useEffect(() => {
     getTextStyle
   } = useAppTheme();
 
+  // Get selected student name for display
+  const getSelectedStudentName = () => {
+    const student = studentsList.find(s => s.id === selectedStudent);
+    return student ? student.fullName : "Select Student";
+  };
+
   return (
     <View style={styles.container}>
+      {/* Render modals */}
+      <StudentSelectionModal />
+      <FacultySelectionModal />
+      <ConcernSelectionModal />
+
       {/* Render TicketOverview if showTicketOverview is true */}
       {showTicketOverview ? (
         <TicketOverview />
@@ -785,67 +927,38 @@ useEffect(() => {
               </View>
             ) : (
               <View style={styles.formGroup}>
+                {/* Student Selection */}
                 <Text style={styles.formLabel}>Student</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={selectedStudent}
-                    onValueChange={(itemValue) => {
-                      setSelectedStudent(itemValue);
-                    }}
-                    style={[styles.picker, { color: 'black' }]}
-                  >
-                    <Picker.Item label="Select Student" value="" color="black" />
-                    {studentsList
-                      .sort((a, b) => a.fullName.localeCompare(b.fullName))
-                      .map((student) => (
-                        <Picker.Item 
-                          key={student.id}
-                          label={student.fullName}
-                          value={student.id}
-                          color="black"
-                        />
-                      ))}
-                  </Picker>
-                </View>
+                <TouchableOpacity 
+                  style={styles.selectButton}
+                  onPress={() => setShowStudentModal(true)}
+                >
+                  <Text style={styles.selectButtonText}>
+                    {getSelectedStudentName()}
+                  </Text>
+                </TouchableOpacity>
                 
+                {/* Faculty Selection */}
                 <Text style={styles.formLabel}>Faculty</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={selectedFaculty}
-                    onValueChange={(itemValue) => setSelectedFaculty(itemValue)}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="Select Faculty" value="" />
-                    {facultyList
-                      .sort((a, b) => a.fullName.localeCompare(b.fullName))
-                      .map((faculty) => (
-                        <Picker.Item 
-                          key={faculty.id}
-                          label={faculty.fullName}
-                          value={faculty.fullName}
-                          color={faculty.status === 'AVAILABLE' ? '#4CAF50' : '#757575'}
-                        />
-                      ))}
-                  </Picker>
-                </View>
+                <TouchableOpacity 
+                  style={styles.selectButton}
+                  onPress={() => setShowFacultyModal(true)}
+                >
+                  <Text style={styles.selectButtonText}>
+                    {selectedFaculty || "Select Faculty"}
+                  </Text>
+                </TouchableOpacity>
                 
+                {/* Concern Selection */}
                 <Text style={styles.formLabel}>Concern</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={selectedConcern}
-                    onValueChange={(itemValue) => setSelectedConcern(itemValue)}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="Select Concern" value="" />
-                    {concernsList.length > 0 ? (
-                      concernsList.map((concern, index) => (
-                        <Picker.Item key={index} label={concern} value={concern} />
-                      ))
-                    ) : (
-                      <Picker.Item label="No concerns available" value="" />
-                    )}
-                  </Picker>
-                </View>
+                <TouchableOpacity 
+                  style={styles.selectButton}
+                  onPress={() => setShowConcernModal(true)}
+                >
+                  <Text style={styles.selectButtonText}>
+                    {selectedConcern || "Select Concern"}
+                  </Text>
+                </TouchableOpacity>
 
                 {/* Add this conditional rendering for Other Concern */}
                 {selectedConcern === "Other" && (
@@ -895,6 +1008,16 @@ useEffect(() => {
 };
 
 const styles = StyleSheet.create({
+  facultyItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   textInput: {
     borderRadius: 5,
     marginBottom: 20,
@@ -980,17 +1103,67 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '600',
   },
-  pickerContainer: {
-    backgroundColor: "#2e4f2e",
+  // New styles for modal selection
+  selectButton: {
     borderRadius: 5,
     marginBottom: 20,
-    overflow: "hidden",
+    padding: 12,
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  picker: {
-    width: "100%",
-    height: 50,
+  selectButtonText: {
+    color: 'black',
+    fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  modalScrollView: {
+    maxHeight: 300,
+  },
+  modalItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalItemText: {
+    fontSize: 16,
+  },
+  selectedModalItem: {
+    fontWeight: 'bold',
+    color: '#1E8449',
+  },
+  modalCloseButton: {
+    backgroundColor: '#800020',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  modalCloseButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  noItemsText: {
+    textAlign: 'center',
+    padding: 20,
+    color: '#757575',
   },
   buttonsContainer: {
     flexDirection: 'row',

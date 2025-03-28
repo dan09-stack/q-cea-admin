@@ -457,7 +457,7 @@ const List: React.FC = () => {
       {/* Edit User Modal */}
       <Modal
         visible={modalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={closeEditModal}
       >
@@ -567,7 +567,7 @@ const List: React.FC = () => {
       {/* Delete User Modal */}
       <Modal
         visible={deleteModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={() => setDeleteModalVisible(false)}
       >

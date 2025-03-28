@@ -237,8 +237,7 @@ const Settings: React.FC = () => {
   };
 
   const renderTimePickers = () => {
-    if (Platform.OS === 'web') {
-      // For web, use native HTML time inputs
+    
       return (
         <>
           <View style={styles.timePickerRow}>
@@ -286,56 +285,7 @@ const Settings: React.FC = () => {
           </View>
         </>
       );
-    } else {
-      // For mobile platforms, use DateTimePicker
-      return (
-        <>
-          <View style={styles.timePickerRow}>
-            <Text style={styles.timeLabel}>Start Time:</Text>
-            <TouchableOpacity 
-              onPress={() => setShowStartTimePicker(true)}
-              style={styles.timeButton}
-            >
-              <Text style={styles.timeButtonText}>
-                {formatTime(businessHours.startHour, businessHours.startMinute)}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          {showStartTimePicker && (
-            <DateTimePicker
-              value={startTimeDate}
-              mode="time"
-              is24Hour={false}
-              display="default"
-              onChange={handleStartTimeChange}
-            />
-          )}
-          
-          <View style={styles.timePickerRow}>
-            <Text style={styles.timeLabel}>End Time:</Text>
-            <TouchableOpacity 
-              onPress={() => setShowEndTimePicker(true)}
-              style={styles.timeButton}
-            >
-              <Text style={styles.timeButtonText}>
-                {formatTime(businessHours.endHour, businessHours.endMinute)}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          {showEndTimePicker && (
-            <DateTimePicker
-              value={endTimeDate}
-              mode="time"
-              is24Hour={false}
-              display="default"
-              onChange={handleEndTimeChange}
-            />
-          )}
-        </>
-      );
-    }
+    
   };
 
   return (

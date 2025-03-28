@@ -46,8 +46,8 @@ const [successModalMessage, setSuccessModalMessage] = useState('');
           setIsLoading(false);
           return;
         }
-        
-        const userRef = doc(db, 'student', currentUser.uid);
+        const userCollection = userData.userType === 'ADMIN' ? 'admin' : 'student';
+        const userRef = firebase.firestore().collection(userCollection).doc(currentUser.uid);
         const docSnapshot = await getDoc(userRef);
         
         if (docSnapshot.exists()) {
@@ -403,8 +403,7 @@ const renderProfileField = (label: string, field: string, isPassword = false, is
       <View style={styles.container}>
         <View style={styles.headerContainer}>
           <Text style={styles.headerTitle}>
-            {userData?.userType === 'ADMIN' ? 'Admin Profile' : 
-             userData?.userType === 'FACULTY' ? 'Faculty Profile' : 'User Profile'}
+            ADMIN PROFILE
           </Text>
         </View>
         <View style={styles.card}>
