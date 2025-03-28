@@ -14,6 +14,7 @@ import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/
 import { Platform } from 'react-native';
 import { useAppTheme } from '../utils/theme';
 import { collection, query, where, getDocs } from "firebase/firestore";
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface AddFacultyProps {
   onClose: () => void;
@@ -26,6 +27,7 @@ interface FacultyFormData {
   phoneNumber: string;
   email: string;
   password: string;
+  confirmPassword: string;
   rfid_uid: string;
 }
 
@@ -47,7 +49,19 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     phoneNumber: "",
     email: "",
     password: "",
+    confirmPassword: "",
     rfid_uid: "",
+  });
+  
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const [errors, setErrors] = useState({
+    fullName: "",
+    idNumber: "",
+    phoneNumber: "",
+    email: "",
+    password: ""
   });
   
   const showAlert = (title: string, message: string) => {
@@ -74,22 +88,139 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     { label: "Program Head-Mechanical Engineering", value: "PH-ME" },
   ];
 
+  const validatePhoneNumber = (phoneNumber: string): boolean => {
+    const phoneRegex = /^(09\d{9}|\+63\d{10})$/;
+    return phoneRegex.test(phoneNumber);
+  };
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateFullName = (name: string): boolean => {
+    const nameRegex = /^[A-Za-z]{2,}(?: [A-Za-z-]+)*, [A-Za-z-]{2,}(?: [A-Za-z-]+)*(?: [A-Z]\.?(?:[A-Z]\.)?)?$/;
+    return nameRegex.test(name);
+  };
+
+  const validateFacultyIdFormat = (id: string): { isValid: boolean; message: string } => {
+    // Faculty ID format: UP-XX-XXX-F
+    const facultyIdRegex = /^UP-\d{2}-\d{3}-[A-Z]$/;
+    
+    // Student ID format: 03-XXXX-XXXXX or 03-XXXX-XXXXXX
+    const studentIdRegex = /^03-\d{4}-\d{5,6}$/;
+    
+    if (facultyIdRegex.test(id)) {
+      return { isValid: true, message: "" };
+    } else if (studentIdRegex.test(id)) {
+      return { 
+        isValid: false, 
+        message: "You entered a student ID format. Faculty ID should follow the format UP-XX-XXX-F" 
+      };
+    } else {
+      return { 
+        isValid: false, 
+        message: "Please enter a valid faculty ID in the format UP-XX-XXX-F" 
+      };
+    }
+  };
+
+  const validatePassword = (password: string): { isValid: boolean; message: string } => {
+    // Check minimum length
+    if (password.length < 8) {
+      return { isValid: false, message: 'Password must be at least 8 characters long' };
+    }
+   
+    // Check for at least one uppercase letter
+    if (!/[A-Z]/.test(password)) {
+      return { isValid: false, message: 'Password must contain at least one uppercase letter' };
+    }
+   
+    // Check for at least one lowercase letter
+    if (!/[a-z]/.test(password)) {
+      return { isValid: false, message: 'Password must contain at least one lowercase letter' };
+    }
+   
+    // Check for at least one number
+    if (!/\d/.test(password)) {
+      return { isValid: false, message: 'Password must contain at least one number' };
+    }
+   
+    // Check for at least one special character
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return { isValid: false, message: 'Password must contain at least one special character' };
+    }
+   
+    // If all checks pass
+    return { isValid: true, message: '' };
+  };
+
+  const validatePasswordsMatch = (password: string, confirmPassword: string): boolean => {
+    return password === confirmPassword;
+  };
+
   const validateForm = () => {
+    let isValid = true;
+    const newErrors = {
+      fullName: "",
+      idNumber: "",
+      phoneNumber: "",
+      email: "",
+      password: ""
+    };
+
+    // Check if all fields are filled
     if (!formData.fullName || !formData.idNumber || !formData.program || 
-        !formData.phoneNumber || !formData.email || !formData.password || !formData.rfid_uid) {
+        !formData.phoneNumber || !formData.email || !formData.password || 
+        !formData.confirmPassword || !formData.rfid_uid) {
       showAlert("Error", "Please fill in all fields");
       return false;
     }
     
-    // Phone number format validation
-    // Check for Philippine phone number format (e.g., 09XXXXXXXXX)
-    const phoneRegex = /^(09|\+639)\d{9}$/;
-    if (!phoneRegex.test(formData.phoneNumber)) {
-      showAlert("Error", "Please enter a valid Philippine phone number (e.g., 09XXXXXXXXX or +639XXXXXXXXX)");
-      return false;
+    // Validate full name format
+    if (!validateFullName(formData.fullName)) {
+      newErrors.fullName = "Please enter a valid name format (Last Name, First Name)";
+      isValid = false;
     }
     
-    return true;
+    // Validate ID number format
+    const idValidation = validateFacultyIdFormat(formData.idNumber);
+    if (!idValidation.isValid) {
+      newErrors.idNumber = idValidation.message;
+      isValid = false;
+    }
+    
+    // Validate phone number format
+    if (!validatePhoneNumber(formData.phoneNumber)) {
+      newErrors.phoneNumber = "Please enter a valid Philippine phone number (e.g., 09XXXXXXXXX or +63XXXXXXXXXX)";
+      isValid = false;
+    }
+    
+    // Validate email format
+    if (!validateEmail(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+      isValid = false;
+    }
+    
+    // Validate password strength
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.isValid) {
+      newErrors.password = passwordValidation.message;
+      isValid = false;
+    } else if (!validatePasswordsMatch(formData.password, formData.confirmPassword)) {
+      // Only check if passwords match if the password itself is valid
+      newErrors.password = "Passwords do not match";
+      isValid = false;
+    }
+    
+    setErrors(newErrors);
+    
+    if (!isValid) {
+      const errorMessages = Object.values(newErrors).filter(msg => msg !== "").join("\n");
+      showAlert("Validation Error", errorMessages);
+    }
+    
+    return isValid;
   };
 
   const checkExistingFaculty = async () => {
@@ -199,23 +330,38 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         <View style={styles.inputContainer}>
           <Text style={getTextStyle(styles.inputLabel)}>Full Name</Text>
           <TextInput
-            style={[getInputStyle(styles.input), styles.whiteBackground]}
+            style={[getInputStyle(styles.input), styles.whiteBackground, errors.fullName ? styles.inputError : null]}
             placeholder="Last Name, First Name"
             placeholderTextColor={getPlaceholderColor()}
             value={formData.fullName}
-            onChangeText={(text) => setFormData({...formData, fullName: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, fullName: text});
+              if (errors.fullName && validateFullName(text)) {
+                setErrors({...errors, fullName: ""});
+              }
+            }}
           />
+          {errors.fullName ? <Text style={styles.errorText}>{errors.fullName}</Text> : null}
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={getTextStyle(styles.inputLabel)}>ID Number</Text>
           <TextInput
-            style={[getInputStyle(styles.input), styles.whiteBackground]}
-            placeholder="ID Number"
+            style={[getInputStyle(styles.input), styles.whiteBackground, errors.idNumber ? styles.inputError : null]}
+            placeholder="ID Number (UP-XX-XXX-F)"
             placeholderTextColor={getPlaceholderColor()}
             value={formData.idNumber}
-            onChangeText={(text) => setFormData({...formData, idNumber: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, idNumber: text});
+              if (errors.idNumber) {
+                const validation = validateFacultyIdFormat(text);
+                if (validation.isValid) {
+                  setErrors({...errors, idNumber: ""});
+                }
+              }
+            }}
           />
+          {errors.idNumber ? <Text style={styles.errorText}>{errors.idNumber}</Text> : null}
         </View>
 
         <View style={styles.inputContainer}>
@@ -240,7 +386,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
               {programs.map((program, index) => (
                 <Picker.Item 
                   key={index}
-                  label={program.label} 
+                  label={program.label}
                   value={program.value}
                 />
               ))}
@@ -251,37 +397,108 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
         <View style={styles.inputContainer}>
           <Text style={getTextStyle(styles.inputLabel)}>Phone Number</Text>
           <TextInput
-            style={[getInputStyle(styles.input), styles.whiteBackground]}
-            placeholder="Phone Number"
+            style={[getInputStyle(styles.input), styles.whiteBackground, errors.phoneNumber ? styles.inputError : null]}
+            placeholder="Phone Number (09XXXXXXXXX or +63XXXXXXXXXX)"
             placeholderTextColor={getPlaceholderColor()}
             keyboardType="phone-pad"
             value={formData.phoneNumber}
-            onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, phoneNumber: text});
+              if (errors.phoneNumber && validatePhoneNumber(text)) {
+                setErrors({...errors, phoneNumber: ""});
+              }
+            }}
           />
+          {errors.phoneNumber ? <Text style={styles.errorText}>{errors.phoneNumber}</Text> : null}
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={getTextStyle(styles.inputLabel)}>Email</Text>
           <TextInput
-            style={[getInputStyle(styles.input), styles.whiteBackground]}
-            placeholder="PHINMA Email"
+            style={[getInputStyle(styles.input), styles.whiteBackground, errors.email ? styles.inputError : null]}
+            placeholder="Email"
             placeholderTextColor={getPlaceholderColor()}
             keyboardType="email-address"
             value={formData.email}
-            onChangeText={(text) => setFormData({...formData, email: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, email: text});
+              if (errors.email && validateEmail(text)) {
+                setErrors({...errors, email: ""});
+              }
+            }}
           />
+          {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={getTextStyle(styles.inputLabel)}>Password</Text>
-          <TextInput
-            style={[getInputStyle(styles.input), styles.whiteBackground]}
-            placeholder="Password"
-            placeholderTextColor={getPlaceholderColor()}
-            secureTextEntry
-            value={formData.password}
-            onChangeText={(text) => setFormData({...formData, password: text})}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[getInputStyle(styles.passwordInput), styles.whiteBackground, errors.password ? styles.inputError : null]}
+              placeholder="Password"
+              placeholderTextColor={getPlaceholderColor()}
+              secureTextEntry={!showPassword}
+              value={formData.password}
+              onChangeText={(text) => {
+                setFormData({...formData, password: text});
+                // Clear password error if it becomes valid and matches confirmation
+                if (errors.password) {
+                  const validation = validatePassword(text);
+                  if (validation.isValid && validatePasswordsMatch(text, formData.confirmPassword)) {
+                    setErrors({...errors, password: ""});
+                  }
+                }
+              }}
+            />
+            <TouchableOpacity 
+              style={styles.eyeIcon} 
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Icon 
+                name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                size={24} 
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
+          {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+          <Text style={styles.passwordHint}>
+            Password must be at least 8 characters long and contain uppercase, lowercase, 
+            number, and special character.
+          </Text>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={getTextStyle(styles.inputLabel)}>Confirm Password</Text>
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[getInputStyle(styles.passwordInput), styles.whiteBackground, errors.password ? styles.inputError : null]}
+              placeholder="Confirm Password"
+              placeholderTextColor={getPlaceholderColor()}
+              secureTextEntry={!showConfirmPassword}
+              value={formData.confirmPassword}
+              onChangeText={(text) => {
+                setFormData({...formData, confirmPassword: text});
+                // Clear password error if passwords match and the password is valid
+                if (errors.password) {
+                  const passwordValidation = validatePassword(formData.password);
+                  if (passwordValidation.isValid && validatePasswordsMatch(formData.password, text)) {
+                    setErrors({...errors, password: ""});
+                  }
+                }
+              }}
+            />
+            <TouchableOpacity 
+              style={styles.eyeIcon} 
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <Icon 
+                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
+                size={24} 
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -334,7 +551,6 @@ const styles = StyleSheet.create({
   inputContainer: {
     width: "90%",
     marginBottom: 15,
-    
   },
   inputLabel: {
     fontSize: 16,
@@ -351,6 +567,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#ccc',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    width: "100%",
+  },
+  passwordInput: {
+    flex: 1,
+    height: 50,
+    borderRadius: 5,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    paddingRight: 50, // Make room for the eye icon
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 15,
+    height: 50,
+    justifyContent: 'center',
+  },
+  inputError: {
+    borderColor: 'red',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  passwordHint: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   whiteBackground: {
     backgroundColor: "white",

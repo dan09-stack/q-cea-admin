@@ -243,7 +243,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="PHINMA Email"
+          placeholder="Email"
           placeholderTextColor="#000000"
           keyboardType="email-address"
           value={formData.email}

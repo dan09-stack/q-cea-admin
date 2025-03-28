@@ -1,9 +1,9 @@
-//
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
-import 'firebase/compat/firestore'; 
+import 'firebase/compat/firestore';
 import 'firebase/compat/functions';
 import 'firebase/compat/storage';
+
 const firebaseConfig = {
   apiKey: "AIzaSyBLudO4g_NIo09Q-r-54-bIhcKXs84Wdk4",
   authDomain: "q-cea-3b4bf.firebaseapp.com",
@@ -14,10 +14,13 @@ const firebaseConfig = {
   measurementId: "G-S64DNW6KP1"
 };
 
+// Initialize Firebase if it hasn't been initialized yet
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
+// Export the Firebase services
 export const auth = firebase.auth();
 export const db = firebase.firestore();
+export const functions = firebase.functions();
 export default firebase;

@@ -10,13 +10,11 @@ import AddAdmin from "@/components/VerifyFaculty";
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
-import AddAdminScreen from "@/components/VerifyFaculty";
 import AddQueueVisitor from "@/components/AddQueueVisitor";
 import List from "@/components/List";
 import Settings from "@/components/Settings";
 const AdminDashboard: React.FC = () => {
   const [currentView, setCurrentView] = useState('faculty'); // Default view is 'faculty'
-  const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [showTicketOverview, setShowTicketOverview] = useState(false);
   return (
     <View style={styles.container}>
