@@ -22,8 +22,6 @@ import { sendSMS } from './services/smsService';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const INITIAL_LOCKOUT_DURATION = 5 * 1000; // 5 seconds in milliseconds (for testing)
-const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
-const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 const Index = () => {
   const router = useRouter();
@@ -39,12 +37,6 @@ const Index = () => {
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState<number | null>(null);
   const [lockoutCountdown, setLockoutCountdown] = useState('');
-  const [showTwoFactorModal, setShowTwoFactorModal] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [expectedCode, setExpectedCode] = useState('');
-  const [otpExpiry, setOtpExpiry] = useState<number | null>(null);
-  const [otpCountdown, setOtpCountdown] = useState('');
-  const [resendingOtp, setResendingOtp] = useState(false);
   
   // Forgot password modal state
   const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
@@ -53,6 +45,7 @@ const Index = () => {
   const [messageText, setMessageText] = useState('');
   const [messageRecipient, setMessageRecipient] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  
   const handleSendMessage = async () => {
     if (!messageRecipient || !messageText) {
       Alert.alert('Error', 'Please enter both recipient number and message text.');
@@ -83,6 +76,7 @@ const Index = () => {
       setSendingMessage(false);
     }
   };
+  
   // Update countdown timer
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -112,44 +106,6 @@ const Index = () => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [isLocked, lockoutTime]);
-
-  // OTP expiry countdown
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    
-    if (showTwoFactorModal && otpExpiry) {
-      intervalId = setInterval(() => {
-        const currentTime = new Date().getTime();
-        const timeLeft = otpExpiry - currentTime;
-        
-        if (timeLeft <= 0) {
-          // OTP expired
-          clearInterval(intervalId);
-          setOtpCountdown('Expired');
-          Alert.alert(
-            'OTP Expired',
-            'Your verification code has expired. Please request a new one.',
-            [{ 
-              text: 'OK',
-              onPress: () => {
-                setShowTwoFactorModal(false);
-                setVerificationCode('');
-              }
-            }]
-          );
-        } else {
-          // Update countdown display
-          const minutes = Math.floor(timeLeft / 60000);
-          const seconds = Math.floor((timeLeft % 60000) / 1000);
-          setOtpCountdown(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
-        }
-      }, 1000);
-    }
-    
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [showTwoFactorModal, otpExpiry]);
 
   useEffect(() => {
     const checkLockStatus = async () => {
@@ -203,73 +159,6 @@ const Index = () => {
     logout();
   }, []);
 
-  // Generate a random 6-digit code for 2FA
-  const generateVerificationCode = () => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setExpectedCode(code);
-    return code;
-  };
-
-  // Send verification code via SMS
-  const sendVerificationCode = async (userEmail: string) => {
-    try {
-      // Get admin data to retrieve phone number
-      const adminData = await getAdminByEmail(userEmail);
-      
-      if (!adminData || !adminData.phone) {
-        setErrorMessage(
-     
-          'Could not find a phone number associated with this account.',
-      
-        );
-        return false;
-      }
-      
-      const code = generateVerificationCode();
-      
-      // Set OTP expiry time
-      const expiryTime = new Date().getTime() + OTP_EXPIRY;
-      setOtpExpiry(expiryTime);
-      
-      // Send SMS with the code
-      await sendSMS(
-        adminData.phone,
-        `Your Q-CEA Admin verification code is: ${code}. Valid for 5 minutes.`
-      );
-      
-      return true;
-    } catch (error) {
-      console.error('Error sending verification code:', error);
-      Alert.alert(
-        'Error',
-        'Failed to send verification code. Please try again.',
-        [{ text: 'OK' }]
-      );
-      return false;
-    }
-  };
-
-  const handleResendOTP = async () => {
-    if (resendingOtp) return;
-    
-    setResendingOtp(true);
-    const success = await sendVerificationCode(email);
-    
-    if (success) {
-      // Reset OTP expiry time
-      const expiryTime = new Date().getTime() + OTP_EXPIRY;
-      setOtpExpiry(expiryTime);
-      
-      Alert.alert(
-        'OTP Resent',
-        'A new verification code has been sent to your registered phone number.',
-        [{ text: 'OK' }]
-      );
-    }
-    
-    setResendingOtp(false);
-  };
-
   const handleLogin = async () => {
     if (isLocked) {
       setErrorMessage(`Account is locked. Please wait ${lockoutCountdown} seconds before trying again.`);
@@ -286,7 +175,7 @@ const Index = () => {
       setErrorMessage('');
   
       const result = await verifyAdminCredentials(email, password);
-      if (email != 'q.cea2024@gmail.com') {
+      if (email != 'albisdandan@gmail.com') {
         setErrorMessage('Invalid email or password');
         return;
       }
@@ -296,17 +185,12 @@ const Index = () => {
         setLoginAttempts(0);
         await AsyncStorage.setItem('loginAttempts', '0');
         
-        // Set a flag to indicate 2FA is required
-        await AsyncStorage.setItem('2faRequired', 'true');
+        // Reset lockout count on successful login
+        setLockoutCount(0);
+        AsyncStorage.setItem('lockoutCount', '0');
         
-        // Send verification code via SMS
-        const smsSent = await sendVerificationCode(email);
-        
-        if (smsSent) {
-          setShowTwoFactorModal(true);
-        }
-        
-        // Return here to prevent any further execution
+        // Navigate directly to dashboard without OTP
+        router.replace('/(screens)/AdminDashboard');
         return;
       } else {
         // Increment login attempts
@@ -344,42 +228,6 @@ const Index = () => {
       setLoading(false);
     }
   };
-  
-  const handleVerifyCode = () => {
-    if (verificationCode === expectedCode) {
-      // Reset lockout count on successful login
-      setLockoutCount(0);
-      AsyncStorage.setItem('lockoutCount', '0');
-      
-      // Set session timeout
-      const sessionTimeout = setTimeout(() => {
-        signOut(auth);
-        router.push('/');
-        setErrorMessage( 'Your session has timed out due to inactivity.');
-      }, SESSION_TIMEOUT);
-      
-      // Store the timeout in AsyncStorage to be able to clear it on logout
-      AsyncStorage.setItem('sessionTimeoutId', sessionTimeout.toString());
-      
-      // Navigate to dashboard
-      setShowTwoFactorModal(false);
-      router.replace('/(screens)/AdminDashboard');
-    } else {
-      setErrorMessage( 'Invalid verification code. Please try again.');
-    }
-  };
-
-  useEffect(() => {
-    const check2FAStatus = async () => {
-      const requires2FA = await AsyncStorage.getItem('2faRequired');
-      if (requires2FA === 'true' && !showTwoFactorModal) {
-        // Force back to login if 2FA is required but modal is not shown
-        router.push('/');
-      }
-    };
-    
-    check2FAStatus();
-  }, [showTwoFactorModal]);
 
   const handleForgotPassword = async () => {
     if (!resetEmail) {
@@ -461,8 +309,7 @@ const Index = () => {
         {errorMessage && !isLocked ? <Text style={styles.error}>{errorMessage}</Text> : null}
         
         {/* Forgot Password Link */}
-              {/* Forgot Password Link */}
-              <TouchableOpacity onPress={() => setForgotPasswordVisible(true)} disabled={isLocked}>
+        <TouchableOpacity onPress={() => setForgotPasswordVisible(true)} disabled={isLocked}>
           <Text style={[styles.forgotPassword, isLocked && styles.disabledText]}>Forgot Password?</Text>
         </TouchableOpacity>
         
@@ -479,59 +326,61 @@ const Index = () => {
           )}
         </TouchableOpacity>
       </View>
+      
       <Modal
-  visible={messageModalVisible}
-  transparent={true}
-  animationType="fade"
-  onRequestClose={() => setMessageModalVisible(false)}
->
-  <View style={styles.modalOverlay}>
-    <BlurView intensity={80} tint="light" style={styles.modalContent}>
-      <Text style={styles.modalTitle}>Send Message</Text>
-      <Text style={styles.modalText}>Enter recipient phone number and message.</Text>
+        visible={messageModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMessageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <BlurView intensity={80} tint="light" style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Send Message</Text>
+            <Text style={styles.modalText}>Enter recipient phone number and message.</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Recipient Phone Number (e.g., 09XXXXXXXXX)"
+              placeholderTextColor="#999"
+              value={messageRecipient}
+              onChangeText={setMessageRecipient}
+              keyboardType="phone-pad"
+            />
+            
+            <TextInput
+              style={[styles.modalInput, styles.messageInput]}
+              placeholder="Message"
+              placeholderTextColor="#999"
+              value={messageText}
+              onChangeText={setMessageText}
+              multiline={true}
+              numberOfLines={4}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.modalCancelButton}
+                onPress={() => setMessageModalVisible(false)}
+              >
+                <Text style={styles.cancelModalText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalSendButton, sendingMessage && styles.buttonDisabled]}
+                onPress={handleSendMessage}
+                disabled={sendingMessage}
+              >
+                {sendingMessage ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalButtonText}>Send</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
       
-      <TextInput
-        style={styles.modalInput}
-        placeholder="Recipient Phone Number (e.g., 09XXXXXXXXX)"
-        placeholderTextColor="#999"
-        value={messageRecipient}
-        onChangeText={setMessageRecipient}
-        keyboardType="phone-pad"
-      />
-      
-      <TextInput
-        style={[styles.modalInput, styles.messageInput]}
-        placeholder="Message"
-        placeholderTextColor="#999"
-        value={messageText}
-        onChangeText={setMessageText}
-        multiline={true}
-        numberOfLines={4}
-      />
-      
-      <View style={styles.modalButtons}>
-        <TouchableOpacity 
-          style={styles.modalCancelButton}
-          onPress={() => setMessageModalVisible(false)}
-        >
-          <Text style={styles.cancelModalText}>Cancel</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.modalSendButton, sendingMessage && styles.buttonDisabled]}
-          onPress={handleSendMessage}
-          disabled={sendingMessage}
-        >
-          {sendingMessage ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.modalButtonText}>Send</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </BlurView>
-  </View>
-</Modal>
       {/* Forgot Password Modal */}
       <Modal
         visible={forgotPasswordVisible}
@@ -574,67 +423,6 @@ const Index = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </BlurView>
-        </View>
-      </Modal>
-
-      {/* Two-Factor Authentication Modal */}
-      <Modal
-        visible={showTwoFactorModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowTwoFactorModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <BlurView intensity={80} tint="light" style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Two-Factor Authentication</Text>
-            <Text style={styles.modalText}>
-              Please enter the verification code sent to your registered phone number.
-            </Text>
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Verification Code"
-              placeholderTextColor="#999"
-              value={verificationCode}
-              onChangeText={setVerificationCode}
-              keyboardType="number-pad"
-              maxLength={6}
-            />
-            
-            {otpExpiry && (
-              <Text style={styles.otpCountdown}>
-                Code expires in: {otpCountdown}
-              </Text>
-            )}
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={styles.modalCancelButton}
-                onPress={() => setShowTwoFactorModal(false)}
-              >
-                <Text style={styles.cancelModalText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.modalSendButton}
-                onPress={handleVerifyCode}
-              >
-                <Text style={styles.modalButtonText}>Verify</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.resendButton}
-              onPress={handleResendOTP}
-              disabled={resendingOtp}
-            >
-              {resendingOtp ? (
-                <ActivityIndicator color="#800020" size="small" />
-              ) : (
-                <Text style={styles.resendText}>Resend Code</Text>
-              )}
-            </TouchableOpacity>
           </BlurView>
         </View>
       </Modal>
@@ -826,21 +614,7 @@ const styles = StyleSheet.create({
   },
   cancelModalText: {
     color: '#000',
-  },
-  otpCountdown: {
-    color: '#800020',
-    marginBottom: 15,
-    fontWeight: 'bold',
-  },
-  resendButton: {
-    marginTop: 15,
-    padding: 10,
-  },
-  resendText: {
-    color: '#800020',
-    textDecorationLine: 'underline',
   }
 });
 
 export default Index;
-

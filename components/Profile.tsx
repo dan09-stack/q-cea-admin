@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView, Dimensions } from 'react-native';
-import firebase from '@/firebaseConfig';
+import { View, Text, StyleSheet, Image, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView, Dimensions, Modal } from 'react-native';
+import { db, auth } from '@/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import firebase from '@/firebaseConfig';
 
 const Profile: React.FC = () => {
-  const [adminData, setAdminData] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -16,27 +19,114 @@ const Profile: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
+  const [idFormatError, setIdFormatError] = useState<string | null>(null);
+  const [phoneFormatError, setPhoneFormatError] = useState<string | null>(null);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorModalMessage, setErrorModalMessage] = useState('');
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+const [successModalMessage, setSuccessModalMessage] = useState('');
 
+  const validateIdFormat = (id: string): boolean => {
+    const idRegex = /^UP-\d{2}-\d{3}-[A-Z]$/;
+    return idRegex.test(id);
+  };
+  const validatePhoneFormat = (phone: string): boolean => {
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    return phoneRegex.test(phone);
+  };
   useEffect(() => {
-    const fetchAdminData = async () => {
+    const fetchUserData = async () => {
       try {
-        const adminRef = firebase.firestore().collection('admin').doc('admin1');
-        const docSnapshot = await adminRef.get();
-        if (docSnapshot.exists) {
-          const data = docSnapshot.data();
-          setAdminData(data);
-          setImageUrl(data?.profilePicture || null);
+        const currentUser = auth.currentUser;
+        
+        if (!currentUser) {
+          Alert.alert('Error', 'No user is currently logged in');
+          setIsLoading(false);
+          return;
         }
+  
+        // First, check if the user exists in the admin collection
+        let userRef = firebase.firestore().collection('admin').doc(currentUser.uid);
+        let docSnapshot = await getDoc(userRef);
+        
+        // If not found in admin collection, check the student collection
+        if (!docSnapshot.exists()) {
+          userRef = firebase.firestore().collection('student').doc(currentUser.uid);
+          docSnapshot = await getDoc(userRef);
+        }
+        
+        if (docSnapshot.exists()) {
+          const data = docSnapshot.data();
+          setUserData(data);
+          // Rest of your code to handle the user data...
+        } else {
+          Alert.alert('Error', 'User data not found');
+        }
+        
+        setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching admin data: ', error);
-        Alert.alert('Error', 'Could not load profile data. Please try again.');
-      } finally {
+        console.error('Error fetching user data:', error);
         setIsLoading(false);
       }
     };
-
-    fetchAdminData();
+  
+    fetchUserData();
   }, []);
+  
+  const SuccessModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={successModalVisible}
+      onRequestClose={() => setSuccessModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, styles.successModalContent]}>
+          <View style={styles.modalHeader}>
+            <Ionicons name="checkmark-circle" size={50} color="#1a5620" style={styles.successIcon} />
+            <Text style={[styles.modalTitle, styles.successModalTitle]}>Success</Text>
+          </View>
+          <View style={styles.modalBody}>
+            <Text style={styles.modalText}>{successModalMessage}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.successModalButton]}
+            onPress={() => setSuccessModalVisible(false)}
+          >
+            <Text style={styles.modalButtonText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+  const ErrorModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={errorModalVisible}
+      onRequestClose={() => setErrorModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Error</Text>
+          </View>
+          <View style={styles.modalBody}>
+            <Text style={styles.modalText}>{errorModalMessage}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={() => setErrorModalVisible(false)}
+          >
+            <Text style={styles.modalButtonText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+  
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -58,76 +148,130 @@ const Profile: React.FC = () => {
   const uploadImage = async (uri: string) => {
     setIsUploading(true);
     try {
+      const currentUser = firebase.auth().currentUser;
+      if (!currentUser) {
+        setErrorModalMessage('No user is currently logged in');
+        setErrorModalVisible(true);
+        setIsUploading(false);
+        return;
+      }
+  
       const response = await fetch(uri);
       const blob = await response.blob();
       
-      const storageRef = firebase.storage();
-      const imageRef = storageRef.ref(`adminProfiles/admin1_profile.jpg`);
+      const storageRef = firebase.storage().ref(`profilePictures/${currentUser.uid}_profile.jpg`);
+      await storageRef.put(blob);
       
-      await imageRef.put(blob);
-      const downloadUrl = await imageRef.getDownloadURL();
+      const downloadUrl = await storageRef.getDownloadURL();
       
-      const adminRef = firebase.firestore().collection('admin').doc('admin1');
-      await adminRef.update({
+      // Determine if user is in student or admin collection
+      const userCollection = userData.userType ? 'student' : 'admin';
+      const userRef = firebase.firestore().collection(userCollection).doc(currentUser.uid);
+      
+      await userRef.update({
         profilePicture: downloadUrl
       });
       
       setImageUrl(downloadUrl);
-      setAdminData({...adminData, profilePicture: downloadUrl});
-      Alert.alert('Success', 'Profile picture updated successfully');
+      setUserData({...userData, profilePicture: downloadUrl});
+      setSuccessModalVisible(true);
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image. Please try again.');
+      setErrorModalMessage('Failed to upload image. Please try again.');
+      setErrorModalVisible(true);
     } finally {
       setIsUploading(false);
     }
   };
 
-
   const handleEdit = async () => {
     if (isEditing) {
+      let hasErrors = false;
+      
+      // Validate ID format if it's being edited
+      if (userData.idNumber && !validateIdFormat(userData.idNumber)) {
+        setIdFormatError("ID must be in UP-XX-XXX-F format");
+        hasErrors = true;
+      }
+      
+      // Validate phone number format
+      if (userData.phoneNumber && !validatePhoneFormat(userData.phoneNumber)) {
+        setPhoneFormatError("Phone must be in 09XXXXXXXXX or +639XXXXXXXXX format");
+        hasErrors = true;
+      }
+      
+      if (hasErrors) {
+        return;
+      }
+      
       setIsSaving(true);
       try {
+        const currentUser = firebase.auth().currentUser;
+        if (!currentUser) {
+          setErrorModalMessage('No user is currently logged in');
+          setErrorModalVisible(true);
+          setIsSaving(false);
+          return;
+        }
+  
         // Check if password has changed
         if (passwordChanged && newPassword) {
-          const user = firebase.auth().currentUser;
-          if (user) {
-            // Reauthenticate the user first
-            const credential = EmailAuthProvider.credential(
-              user.email || adminData.email,
-              currentPassword
-            );
+          // Validate password
+          if (!currentPassword) {
+            setErrorModalMessage('Please enter your current password');
+            setErrorModalVisible(true);
+            setIsSaving(false);
+            return;
+          }
+          
+          if (!newPassword || newPassword.length < 6) {
+            setErrorModalMessage('New password must be at least 6 characters');
+            setErrorModalVisible(true);
+            setIsSaving(false);
+            return;
+          }
+          
+          // Reauthenticate the user first
+          const credential = EmailAuthProvider.credential(
+            currentUser.email || userData.email,
+            currentPassword
+          );
+          
+          try {
+            await reauthenticateWithCredential(currentUser, credential);
             
-            try {
-              await reauthenticateWithCredential(user, credential);
-              
-              // Update the password
-              await updatePassword(user, newPassword);
-              
-              // Update the stored password in Firestore (optional, for display purposes)
-              adminData.password = newPassword;
-              
-              Alert.alert('Success', 'Password updated successfully');
-              setPasswordChanged(false);
-              setCurrentPassword('');
-              setNewPassword('');
-            } catch (authError) {
-              console.error('Authentication error:', authError);
-              Alert.alert('Authentication Error', 'Current password is incorrect or you need to reauthenticate.');
-              setIsSaving(false);
-              return;
-            }
+            // Update the password
+            await updatePassword(currentUser, newPassword);
+            
+            setSuccessModalMessage('Password updated successfully');
+            setSuccessModalVisible(true);
+            setPasswordChanged(false);
+            setCurrentPassword('');
+            setNewPassword('');
+          } catch (authError) {
+            console.error('Authentication error:', authError);
+            setErrorModalMessage('Current password is incorrect or you need to reauthenticate');
+            setErrorModalVisible(true);
+            setIsSaving(false);
+            return;
           }
         }
         
-        // Update other profile data in Firestore
-        const adminRef = firebase.firestore().collection('admin').doc('admin1');
-        await adminRef.update(adminData);
+        // Determine if user is in student or admin collection
+        const userCollection = userData.userType ? 'student' : 'admin';
+        const userRef = firebase.firestore().collection(userCollection).doc(currentUser.uid);
+        
+        // Create a copy of userData without password and email for Firestore update
+        const { password, email, ...dataToUpdate } = userData;
+        
+        await userRef.update(dataToUpdate);
         setIsEditing(false);
-        Alert.alert('Success', 'Profile updated successfully');
+        setSuccessModalMessage('Profile updated successfully');
+        setSuccessModalVisible(true);
       } catch (error) {
         console.error('Error updating profile:', error);
-        Alert.alert('Error', 'Failed to update profile. Please try again.');
+        setErrorModalMessage('Failed to update profile. Please try again.');
+        setErrorModalVisible(true);
       } finally {
         setIsSaving(false);
       }
@@ -135,62 +279,111 @@ const Profile: React.FC = () => {
       setIsEditing(true);
     }
   };
-
-  // Add a method to handle password change
   const handlePasswordChange = () => {
     setPasswordChanged(true);
     setShowPasswordModal(true);
   };
 
-  // Modify renderProfileField to handle password field specially
-  const renderProfileField = (label: string, field: string, isPassword = false) => (
-    <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {isEditing ? (
-        isPassword ? (
-          <View>
-            <TouchableOpacity 
-              style={styles.passwordChangeButton} 
-              onPress={handlePasswordChange}
-            >
-              <Text style={styles.passwordChangeText}>Change Password</Text>
-            </TouchableOpacity>
-            {passwordChanged && (
-              <>
-                <TextInput 
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  style={[styles.input, {marginTop: 10}]}
-                  secureTextEntry
-                  placeholder="Enter current password"
-                  placeholderTextColor="#000"
+// Modify renderProfileField to handle email field specially
+const renderProfileField = (label: string, field: string, isPassword = false, isEmail = false, isId = false, isPhone = false) => (
+  <View style={styles.fieldContainer}>
+    <Text style={styles.fieldLabel}>{label}</Text>
+    {isEditing && !isEmail && !isPassword ? (
+      <View>
+        <TextInput 
+          value={userData[field]}
+          onChangeText={(text) => {
+            setUserData({...userData, [field]: text});
+            // Clear errors when typing
+            if (isId) setIdFormatError(null);
+            if (isPhone) setPhoneFormatError(null);
+          }}
+          style={[
+            styles.input, 
+            (isId && idFormatError) || (isPhone && phoneFormatError) ? styles.inputError : {}
+          ]}
+          placeholder={
+            isId ? "UP-XX-XXX-F" : 
+            isPhone ? "09XXXXXXXXX" : 
+            `Enter ${label.toLowerCase()}`
+          }
+          placeholderTextColor="#666"
+          keyboardType={isPhone ? "phone-pad" : "default"}
+        />
+        {isId && idFormatError && (
+          <Text style={styles.errorText}>{idFormatError}</Text>
+        )}
+        {isPhone && phoneFormatError && (
+          <Text style={styles.errorText}>{phoneFormatError}</Text>
+        )}
+        {isId && (
+          <Text style={styles.helperText}>Format: UP-XX-XXX-F (e.g., UP-20-123-A)</Text>
+        )}
+        {isPhone && (
+          <Text style={styles.helperText}>Format: 09XXXXXXXXX or +639XXXXXXXXX</Text>
+        )}
+      </View>
+    ) : isEditing && isPassword ? (
+      <View>
+        <TouchableOpacity 
+          style={styles.passwordChangeButton} 
+          onPress={handlePasswordChange}
+        >
+          <Text style={styles.passwordChangeText}>Change Password</Text>
+        </TouchableOpacity>
+        {passwordChanged && (
+          <>
+            <View style={styles.passwordInputContainer}>
+              <TextInput 
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                style={[styles.passwordInput, {marginTop: 10}]}
+                secureTextEntry={!showCurrentPassword}
+                placeholder="Enter current password"
+                placeholderTextColor="#000"
+              />
+              <TouchableOpacity 
+                style={styles.eyeIconContainer}
+                onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+              >
+                <Ionicons 
+                  name={showCurrentPassword ? "eye-off-outline" : "eye-outline"} 
+                  size={24} 
+                  color="#666" 
                 />
-                <TextInput 
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  style={[styles.input, {marginTop: 10}]}
-                  secureTextEntry
-                  placeholder="Enter new password"
-                  placeholderTextColor="#000"
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.passwordInputContainer}>
+              <TextInput 
+                value={newPassword}
+                onChangeText={setNewPassword}
+                style={[styles.passwordInput, {marginTop: 10}]}
+                secureTextEntry={!showNewPassword}
+                placeholder="Enter new password"
+                placeholderTextColor="#000"
+              />
+              <TouchableOpacity 
+                style={styles.eyeIconContainer}
+                onPress={() => setShowNewPassword(!showNewPassword)}
+              >
+                <Ionicons 
+                  name={showNewPassword ? "eye-off-outline" : "eye-outline"} 
+                  size={24} 
+                  color="#666" 
                 />
-              </>
-            )}
-          </View>
-        ) : (
-          <TextInput 
-            value={adminData[field]}
-            onChangeText={(text) => setAdminData({...adminData, [field]: text})}
-            style={styles.input}
-            secureTextEntry={isPassword}
-            placeholder={`Enter ${label.toLowerCase()}`}
-            placeholderTextColor="#666"
-          />
-        )
-      ) : (
-        <Text style={styles.fieldValue}>{isPassword ? '••••••••' : adminData[field]}</Text>
-      )}
-    </View>
-  );
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+    ) : (
+      <Text style={styles.fieldValue}>
+        {isPassword ? '••••••••' : userData[field]}
+      </Text>
+    )}
+  </View>
+);
 
   if (isLoading) {
     return (
@@ -203,9 +396,13 @@ const Profile: React.FC = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ErrorModal />
+        <SuccessModal />
       <View style={styles.container}>
         <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Admin Profile</Text>
+          <Text style={styles.headerTitle}>
+            ADMIN PROFILE
+          </Text>
         </View>
         <View style={styles.card}>
           <View style={styles.profileHeader}>
@@ -228,11 +425,12 @@ const Profile: React.FC = () => {
           </View>
   
           <View style={styles.infoContainer}>
-            {adminData ? (
+            {userData ? (
               <>
-                {renderProfileField('Name', 'name')}
-                {renderProfileField('ID', 'id')}
-                {renderProfileField('Phone', 'phone')}
+                {renderProfileField('Name', 'fullName')}
+                {renderProfileField('ID Number', 'idNumber', false, false, true)}
+                {renderProfileField('Phone', 'phoneNumber', false, false, false, true)}
+                {renderProfileField('Email', 'email', false, true)}
                 {renderProfileField('Password', 'password', true)}
                 
                 <TouchableOpacity 
@@ -281,6 +479,101 @@ const { width } = Dimensions.get('window');
 const cardWidth = width > 700 ? 600 : width * 0.9;
 
 const styles = StyleSheet.create({
+  successModalContent: {
+    borderLeftWidth: 5,
+    borderLeftColor: '#1a5620',
+  },
+  successModalTitle: {
+    color: '#1a5620',
+  },
+  successModalButton: {
+    backgroundColor: '#1a5620',
+  },
+  successIcon: {
+    marginBottom: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#800020',
+  },
+  modalBody: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#333',
+  },
+  modalButton: {
+    backgroundColor: '#800020',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  passwordInputContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 18,
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+    color: '#000',
+  },
+  eyeIconContainer: {
+    position: 'absolute',
+    right: 10,
+    padding: 5,
+    top: 15,
+  },
+  inputError: {
+    borderColor: '#f44336',
+    borderWidth: 2,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
   passwordChangeButton: {
     backgroundColor: '#1a5620',
     padding: 10,

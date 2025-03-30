@@ -14,7 +14,7 @@ import {
   Image
 } from 'react-native';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db, functions } from '../firebaseConfig';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 interface UserItem {
@@ -38,21 +38,39 @@ const List: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL');
-  const [showArchived, setShowArchived] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [formData, setFormData] = useState<Partial<UserItem>>({});
+  const [fullNameError, setFullNameError] = useState<string | null>(null);
+  const [idNumberError, setIdNumberError] = useState<string | null>(null);
+  const [phoneNumberError, setPhoneNumberError] = useState<string | null>(null);
 
   // Programs list for dropdown
-  const programs = [
-    "ARCH", "CE", "CPE", "EE", "ECE", "ME"
+  const basePrograms = [
+    { label: "B.S. Architecture", value: "ARCH" },
+    { label: "B.S. Civil Engineering", value: "CE" },
+    { label: "B.S. Computer Engineering", value: "CPE" },
+    { label: "B.S. Electrical Engineering", value: "EE" },
+    { label: "B.S. Electronics Engineering", value: "ECE" },
+    { label: "B.S. Mechanical Engineering", value: "ME" },
   ];
+  
+  // Additional program head options for faculty only
+  const programHeadOptions = [
+    { label: "Program Head-Architecture", value: "PH-ARCH" },
+    { label: "Program Head-Civil Engineering", value: "PH-CE" },
+    { label: "Program Head-Computer Engineering", value: "PH-CPE" },
+    { label: "Program Head-Electrical Engineering", value: "PH-EE" },
+    { label: "Program Head-Electronics Engineering", value: "PH-ECE" },
+    { label: "Program Head-Mechanical Engineering", value: "PH-ME" },
+  ];
+  
 
   // User types list for dropdown
   const userTypes = [
-    "STUDENT", "FACULTY", 
+    "STUDENT", "FACULTY", "VISITOR"
   ];
 
   // Status options
@@ -66,6 +84,28 @@ const List: React.FC = () => {
     } else {
       Alert.alert(title, message);
     }
+  };
+
+  // Validation functions
+  const validateFullName = (name: string): boolean => {
+    const nameRegex = /^[A-Za-z]{2,}(?: [A-Za-z-]+)*, [A-Za-z-]{2,}(?: [A-Za-z-]+)*(?: [A-Z]\.?(?:[A-Z]\.)?)?$/;
+    return nameRegex.test(name);
+  };
+
+  const validateIdNumber = (id: string, userType: string): boolean => {
+    if (userType === "STUDENT") {
+      const studentIdRegex = /^03-\d{4}-\d{5,6}$/;
+      return studentIdRegex.test(id);
+    } else {
+      const facultyIdRegex = /^UP-\d{2}-\d{3}-[A-Z]$/;
+      return facultyIdRegex.test(id);
+    }
+  };
+
+  const validatePhoneNumber = (phone: string): boolean => {
+    // Phone format: 09XXXXXXXXX or +639XXXXXXXXX
+    const phoneRegex = /^(09|\+639)\d{9}$/;
+    return phoneRegex.test(phone);
   };
 
   // Fetch users from Firestore
@@ -83,7 +123,7 @@ const List: React.FC = () => {
           userType: data.userType || '',
           rfid_uid: data.rfid_uid || '',
           program: data.program || '',
-          status: data.status || 'UNAVAILABLE',
+          status: data.status || '',
           numOnQueue: data.numOnQueue || 0,
           phoneNumber: data.phoneNumber || '',
           idNumber: data.idNumber || '',
@@ -104,10 +144,7 @@ const List: React.FC = () => {
   useEffect(() => {
     let result = users;
     
-    // Filter by archived status
-    result = result.filter(user => user.archived === showArchived);
     
-    // Filter by type if not "ALL"
     if (filterType !== 'ALL') {
       result = result.filter(user => user.userType === filterType);
     }
@@ -123,12 +160,15 @@ const List: React.FC = () => {
     }
     
     setFilteredUsers(result);
-  }, [searchQuery, filterType, users, showArchived]);
+  }, [searchQuery, filterType, users]);
 
   // Handle edit button press
   const handleEdit = (user: UserItem) => {
     setSelectedUser(user);
     setFormData({...user});
+    setFullNameError(null);
+    setIdNumberError(null);
+    setPhoneNumberError(null);
     setModalVisible(true);
   };
 
@@ -138,281 +178,192 @@ const List: React.FC = () => {
     setDeleteModalVisible(true);
   };
 
-  // Handle archive button press
-  const handleArchive = async (user: UserItem) => {
-    try {
-      const userRef = doc(db, 'student', user.id);
-      await updateDoc(userRef, {
-        archived: !user.archived
-      });
-      showAlert('Success', `User ${user.archived ? 'unarchived' : 'archived'} successfully!`);
-    } catch (error) {
-      console.error('Error archiving/unarchiving user:', error);
-      showAlert('Error', 'Failed to update user. Please try again.');
-    }
-  };
-
   const confirmDelete = async () => {
-    console.log("🔍 Selected user before deletion:", selectedUser);
-  
-    // Validate if selectedUser and email exist
-    if (!selectedUser || !selectedUser.email) {
-      console.error("❌ Error: No email found for selected user", selectedUser);
-      showAlert("Error", "User email is missing. Cannot delete.");
-      return;
-    }
-  
-    // Log the email to be deleted
-    console.log("✅ Deleting user with email:", selectedUser.email);
-    console.log("📤 Sending request to deleteAuthUser with:", JSON.stringify({ email: selectedUser.email }));
-  
+    if (!selectedUser) return;
+    
     try {
-      const userEmail = selectedUser.email.trim(); // Ensure it's a valid string
-      if (!userEmail) {
-        console.error("❌ Error: Invalid email format", selectedUser.email);
-        showAlert("Error", "Invalid email format.");
-        return;
-      }
-  
-      console.log("📤 Calling deleteAuthUser with email:", { email: userEmail });
-  
-      // Define the expected result structure
-      interface DeleteAuthUserResponse {
-        success: boolean;
-        message?: string; // Optional message to handle error messages from Firebase Functions
-      }
-  
-      // Firebase Functions: Call the deleteAuthUser function with proper typing
-      const functions = getFunctions();
+      setIsLoading(true);
+      await deleteDoc(doc(db, 'student', selectedUser.id));
+
+      // First try to delete the user from Firebase Authentication
+      if (selectedUser.email) {
+        try {
+         
+          interface DeleteAuthUserResponse {
+            success: boolean;
+            message?: string; 
+          }
+          const functions = getFunctions();
       const deleteAuthUser = httpsCallable<{ email: string }, DeleteAuthUserResponse>(functions, "deleteAuthUser");
   
       console.log("🔄 Sending delete request to Firebase Functions...");
       // Corrected the way the email is passed to Firebase Functions
-      const result = await deleteAuthUser({ email: userEmail }); // Pass email directly, not nested in 'data'
-  
-      console.log("📩 Response from deleteAuthUser:", result.data);
-  
-      if (result.data?.success) {
-        console.log("✅ Firebase Auth user deleted successfully!");
-  
-        // Delete the user from Firestore if Auth deletion is successful
-        console.log("🗑️ Deleting user from Firestore with ID:", selectedUser.id);
-        await deleteDoc(doc(db, "student", selectedUser.id));
-        console.log("🗑️ User deleted from Firestore:", selectedUser.id);
-  
-        showAlert("Success", "User deleted successfully!");
-      } else {
-        console.warn("⚠️ Warning: Firebase Auth deletion failed!", result.data?.message || "Unknown error");
-        showAlert("Warning", result.data?.message || "User deleted from Firestore, but authentication deletion failed.");
+      const result = await deleteAuthUser({ email: selectedUser.email });
+          console.log('User authentication deleted successfully');
+        } catch (authError: any) {
+          console.error('Error deleting user from authentication:', authError);
+          // Continue with Firestore deletion even if auth deletion fails
+        }
       }
-  
-      // Close modal after deletion attempt
+      
+      // Then delete the user document from Firestore
+      
+      showAlert('Success', 'User deleted successfully!');
       setDeleteModalVisible(false);
-      console.log("🔒 Modal closed after deletion.");
-    } catch (error) {
-      // Log and display any errors that occur during the deletion process
-      console.error("❌ Error deleting user:", error);
-      showAlert("Error", "Failed to delete user. Please try again.");
+      setIsLoading(false);
+    } catch (error: any) {
+      setIsLoading(false);
+      console.error('Error deleting user:', error);
+      showAlert('Error', 'Failed to delete user. Please try again.');
     }
   };
-  
- // Save edited user with duplicate checking
-const saveUser = async () => {
-  if (!selectedUser || !formData) return;
-  if (!formData.fullName || !formData.idNumber || !formData.phoneNumber) {
-    showAlert('Error', 'Full Name, ID Number, and Phone Number are required fields.');
-    return;
-  }
-  try {
-    // Check if any fields have changed that need duplicate checking
-    const fieldsToCheck = [];
-    if (formData.idNumber !== selectedUser.idNumber) fieldsToCheck.push('idNumber');
-    if (formData.phoneNumber !== selectedUser.phoneNumber) fieldsToCheck.push('phoneNumber');
-    // Add RFID UID check if it has changed and is not empty
-    if (formData.rfid_uid !== selectedUser.rfid_uid && formData.rfid_uid) fieldsToCheck.push('rfid_uid');
-    
-    // If any of these fields changed, check for duplicates
-    if (fieldsToCheck.length > 0) {
-      setIsLoading(true);
-      
-      // Create queries for each field that needs checking
-      const duplicateChecks = fieldsToCheck.map(async (field) => {
-        const fieldValue = formData[field as keyof typeof formData];
-        if (!fieldValue) return null;
-        
-        const fieldQuery = query(
-          collection(db, 'student'),
-          where(field, '==', fieldValue),
-        );
-        
-        const querySnapshot = await getDocs(fieldQuery);
-        
-        // Check if any document exists with this value (excluding the current user)
-        const duplicates = querySnapshot.docs.filter(doc => doc.id !== selectedUser.id);
-        
-        if (duplicates.length > 0) {
-          return { field, value: fieldValue };
-        }
-        return null;
-      });
-      
-      // Wait for all duplicate checks to complete
-      const results = await Promise.all(duplicateChecks);
-      const foundDuplicates = results.filter(result => result !== null);
-      
-      if (foundDuplicates.length > 0) {
-        const fieldNameMap = {
-          'idNumber': 'ID Number',
-          'phoneNumber': 'Phone Number',
-          'email': 'Email',
-          'rfid_uid': 'RFID UID'  // Add RFID UID to the field name map
-        };
-        
-        const duplicateFieldNames = foundDuplicates
-          .map(d => fieldNameMap[d?.field as keyof typeof fieldNameMap] || d?.field)
-          .join(', ');
-          
-        showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFieldNames}. Please use different values.`);
-        setIsLoading(false);
-        return;
-      }
-    }
-    
-    // If no duplicates found, proceed with the update
-    const userRef = doc(db, 'student', selectedUser.id);
-    await updateDoc(userRef, {
-      email: formData.email,
-      fullName: formData.fullName,
-      userType: formData.userType,
-      rfid_uid: formData.rfid_uid,
-      program: formData.program,
-      status: formData.status,
-      numOnQueue: formData.numOnQueue || 0,
-      phoneNumber: formData.phoneNumber,
-      idNumber: formData.idNumber,
-      userTicketNumber: formData.userTicketNumber,
-      archived: formData.archived
-    });
-    
-    showAlert('Success', 'User updated successfully!');
+
+  // Close edit modal
+  const closeEditModal = () => {
     setModalVisible(false);
-  } catch (error) {
-    console.error('Error updating user:', error);
-    showAlert('Error', 'Failed to update user. Please try again.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setFullNameError(null);
+    setIdNumberError(null);
+    setPhoneNumberError(null);
+  };
 
-
-  // Create new user with duplicate checking
-  // Create new user with duplicate checking
-const createUser = async () => {
-  if (!formData.email || !formData.fullName || !formData.userType) {
-    showAlert('Error', 'Email, Name and User Type are required');
-    return;
-  }
-  
-  try {
-    setIsLoading(true);
-    
-    // Fields to check for duplicates
-    const fieldsToCheck = ['email', 'fullName', 'idNumber', 'phoneNumber'].filter(
-      field => formData[field as keyof typeof formData]
-    );
-    
-    // Add RFID UID to fields to check if it's not empty
-    if (formData.rfid_uid) {
-      fieldsToCheck.push('rfid_uid');
-    }
-    
-    // Create queries for each field that needs checking
-    const duplicateChecks = fieldsToCheck.map(async (field) => {
-      const fieldValue = formData[field as keyof typeof formData];
-      if (!fieldValue) return null;
-      
-      const fieldQuery = query(
-        collection(db, 'student'),
-        where(field, '==', fieldValue),
-      );
-      
-      const querySnapshot = await getDocs(fieldQuery);
-      
-      if (!querySnapshot.empty) {
-        return { field, value: fieldValue };
-      }
-      return null;
-    });
-    
-    // Wait for all duplicate checks to complete
-    const results = await Promise.all(duplicateChecks);
-    const foundDuplicates = results.filter(result => result !== null);
-    
-    if (foundDuplicates.length > 0) {
-      const fieldNameMap = {
-        'fullName': 'Full Name',
-        'idNumber': 'ID Number',
-        'phoneNumber': 'Phone Number',
-        'email': 'Email',
-        'rfid_uid': 'RFID UID'  // Add RFID UID to the field name map
-      };
-      
-      const duplicateFieldNames = foundDuplicates
-        .map(d => fieldNameMap[d?.field as keyof typeof fieldNameMap] || d?.field)
-        .join(', ');
-      
-      showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFieldNames}. Please use different values.`);
-      setIsLoading(false);
-      return;
-    }
-    
-    // If no duplicates found, proceed with creating the user
-    await addDoc(collection(db, 'student'), {
-      email: formData.email,
-      fullName: formData.fullName,
-      userType: formData.userType,
-      rfid_uid: formData.rfid_uid || '',
-      program: formData.program || '',
-      status: formData.status || 'UNAVAILABLE',
-      numOnQueue: formData.numOnQueue || 0,
-      phoneNumber: formData.phoneNumber || '',
-      idNumber: formData.idNumber || '',
-      isVerified: true,
-      createdAt: new Date(),
-      userTicketNumber: formData.userTicketNumber || '',
-      archived: false
-    });
-    
-    showAlert('Success', 'User created successfully!');
+  // Close create modal
+  const closeCreateModal = () => {
     setCreateModalVisible(false);
-    setFormData({});
-  } catch (error) {
-    console.error('Error creating user:', error);
-    showAlert('Error', 'Failed to create user. Please try again.');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+    setFullNameError(null);
+    setIdNumberError(null);
+    setPhoneNumberError(null);
+  };
 
   // Handle input change
   const handleInputChange = (field: string, value: string | number | boolean) => {
+    // Clear previous errors when user starts typing
+    if (field === 'fullName') setFullNameError(null);
+    if (field === 'idNumber') setIdNumberError(null);
+    if (field === 'phoneNumber') setPhoneNumberError(null);
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  // Open create user modal
-  const openCreateModal = () => {
-    setFormData({
-      status: 'UNAVAILABLE',
-      numOnQueue: 0,
-      userType: 'STUDENT',
-      archived: false
-    });
-    setCreateModalVisible(true);
+  // Save edited user with duplicate checking
+  const saveUser = async () => {
+    if (!selectedUser || !formData) return;
+    if (!formData.fullName || !formData.idNumber || !formData.phoneNumber) {
+      showAlert('Error', 'Full Name, ID Number, and Phone Number are required fields.');
+      return;
+    }
+
+    // Validate formats
+    let hasError = false;
+    
+    if (!validateFullName(formData.fullName)) {
+      setFullNameError('Full name should be in format: Last Name, First Name MI.');
+      hasError = true;
+    }
+    
+    if (!validateIdNumber(formData.idNumber, formData.userType as string)) {
+      setIdNumberError('ID Number should be in format UP-XX-XXX-X for faculty or UP-XXXX-XXXXX/UP-XXXX-XXXXXX for students');
+      hasError = true;
+    }
+    
+    if (!validatePhoneNumber(formData.phoneNumber)) {
+      setPhoneNumberError('Phone Number should be in format 09XXXXXXXXX or +639XXXXXXXXX');
+      hasError = true;
+    }
+    
+    if (hasError) {
+      return;
+    }
+    
+    try {
+      // Check if any fields have changed that need duplicate checking
+      const fieldsToCheck = [];
+      if (formData.idNumber !== selectedUser.idNumber) fieldsToCheck.push('idNumber');
+      if (formData.phoneNumber !== selectedUser.phoneNumber) fieldsToCheck.push('phoneNumber');
+      // Add RFID UID check if it has changed and is not empty
+      if (formData.rfid_uid !== selectedUser.rfid_uid && formData.rfid_uid) fieldsToCheck.push('rfid_uid');
+      
+      // If any of these fields changed, check for duplicates
+      if (fieldsToCheck.length > 0) {
+        setIsLoading(true);
+        
+        // Create queries for each field that needs checking
+        const duplicateChecks = fieldsToCheck.map(async (field) => {
+          const fieldValue = formData[field as keyof typeof formData];
+          if (!fieldValue) return null;
+          
+          const fieldQuery = query(
+            collection(db, 'student'),
+            where(field, '==', fieldValue),
+          );
+          
+          const querySnapshot = await getDocs(fieldQuery);
+          
+          // Check if any document exists with this value (excluding the current user)
+          const duplicates = querySnapshot.docs.filter(doc => doc.id !== selectedUser.id);
+          
+          if (duplicates.length > 0) {
+            return { field, value: fieldValue };
+          }
+          return null;
+        });
+        
+        // Wait for all duplicate checks to complete
+        const results = await Promise.all(duplicateChecks);
+        const foundDuplicates = results.filter(result => result !== null);
+        
+        if (foundDuplicates.length > 0) {
+          const fieldNameMap = {
+            'idNumber': 'ID Number',
+            'phoneNumber': 'Phone Number',
+            'email': 'Email',
+            'rfid_uid': 'RFID UID'  // Add RFID UID to the field name map
+          };
+          
+          const duplicateFieldNames = foundDuplicates
+            .map(d => fieldNameMap[d?.field as keyof typeof fieldNameMap] || d?.field)
+            .join(', ');
+            
+          showAlert('Duplicate Found', `Another user already exists with the same ${duplicateFieldNames}. Please use different values.`);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // If no duplicates found, proceed with the update
+      const userRef = doc(db, 'student', selectedUser.id);
+      await updateDoc(userRef, {
+        email: formData.email,
+        fullName: formData.fullName,
+        userType: formData.userType,
+        rfid_uid: formData.rfid_uid,
+        program: formData.program,
+        status: formData.status,
+        numOnQueue: formData.numOnQueue || 0,
+        phoneNumber: formData.phoneNumber,
+        idNumber: formData.idNumber,
+        userTicketNumber: formData.userTicketNumber,
+        archived: formData.archived
+      });
+      
+      showAlert('Success', 'User updated successfully!');
+      setFullNameError(null);
+      setIdNumberError(null);
+      setPhoneNumberError(null);
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showAlert('Error', 'Failed to update user. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  
+
+
 
   // Render user item
   const renderUserItem = ({ item }: { item: UserItem }) => (
@@ -435,12 +386,7 @@ const createUser = async () => {
         <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editButton}>
           <Icon name="create-outline" size={24} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => handleArchive(item)} 
-          style={styles.archiveButton}
-        >
-          <Icon name={item.archived ? "refresh-outline" : "archive-outline"} size={24} color="#fff" />
-        </TouchableOpacity>
+        
         <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteButton}>
           <Icon name="trash-outline" size={24} color="#fff" />
         </TouchableOpacity>
@@ -450,7 +396,6 @@ const createUser = async () => {
 
   return (
     <View style={styles.container}>
-   
       <View style={styles.header}>
         <Text style={styles.title}>Users List</Text>
         <View style={styles.filterContainer}>
@@ -480,15 +425,13 @@ const createUser = async () => {
               <Text style={[styles.filterText, filterType === 'FACULTY' && styles.activeFilterText]}>Faculty</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.filterButton, showArchived && styles.activeFilter]} 
-              onPress={() => setShowArchived(!showArchived)}
+              style={[styles.filterButton, filterType === 'VISITOR' && styles.activeFilter]} 
+              onPress={() => setFilterType('VISITOR')}
             >
-              <Text style={[styles.filterText, showArchived && styles.activeFilterText]}>
-                {showArchived ? 'Archived' : 'Active'}
-              </Text>
+              <Text style={[styles.filterText, filterType === 'VISITOR' && styles.activeFilterText]}>Visitors</Text>
             </TouchableOpacity>
           </View>
-        
+          
         </View>
       </View>
 
@@ -514,38 +457,41 @@ const createUser = async () => {
       {/* Edit User Modal */}
       <Modal
         visible={modalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={closeEditModal}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Edit User</Text>
             <ScrollView style={styles.formContainer}>
-            <Text style={styles.inputLabel}>Full Name <Text style={styles.requiredField}>*</Text></Text>
+              <Text style={styles.inputLabel}>Full Name <Text style={styles.requiredField}>*</Text></Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fullNameError ? styles.inputError : null]}
                 value={formData.fullName}
                 onChangeText={(text) => handleInputChange('fullName', text)}
                 placeholder="Full Name"
               />
+              {fullNameError && <Text style={styles.errorText}>{fullNameError}</Text>}
 
               <Text style={styles.inputLabel}>ID Number <Text style={styles.requiredField}>*</Text></Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, idNumberError ? styles.inputError : null]}
                 value={formData.idNumber}
                 onChangeText={(text) => handleInputChange('idNumber', text)}
                 placeholder="ID Number"
               />
+              {idNumberError && <Text style={styles.errorText}>{idNumberError}</Text>}
 
               <Text style={styles.inputLabel}>Phone Number <Text style={styles.requiredField}>*</Text></Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, phoneNumberError ? styles.inputError : null]}
                 value={formData.phoneNumber}
                 onChangeText={(text) => handleInputChange('phoneNumber', text)}
                 placeholder="Phone Number"
                 keyboardType="phone-pad"
               />
+              {phoneNumberError && <Text style={styles.errorText}>{phoneNumberError}</Text>}
 
               {formData.userType !== 'STUDENT' && (
                 <>
@@ -574,28 +520,33 @@ const createUser = async () => {
                   </View>
                 </>
               )}
-              
-              <Text style={styles.inputLabel}>Program</Text>
-              <View style={styles.pickerContainer}>
-                {programs.map(program => (
-                  <TouchableOpacity 
-                    key={program}
-                    style={[
-                      styles.pickerItem, 
-                      formData.program === program && styles.selectedPickerItem
-                    ]}
-                    onPress={() => handleInputChange('program', program)}
-                  >
-                    <Text style={styles.pickerText}>{program}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-      
+              {formData.userType !== 'VISITOR' && (
+                <>
+                  <Text style={styles.inputLabel}>Program</Text>
+                  <View style={styles.pickerContainer}>
+                    {(formData.userType === 'FACULTY' ? 
+                      [...basePrograms, ...programHeadOptions] : 
+                      basePrograms
+                    ).map(program => (
+                      <TouchableOpacity 
+                        key={program.value}
+                        style={[
+                          styles.pickerItem, 
+                          formData.program === program.value && styles.selectedPickerItem
+                        ]}
+                        onPress={() => handleInputChange('program', program.value)}
+                      >
+                        <Text style={styles.pickerText}>{program.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
             </ScrollView>
             
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
+              <TouchableOpacity style={styles.cancelButton} onPress={closeEditModal}>
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveButton} onPress={saveUser}>
@@ -616,7 +567,7 @@ const createUser = async () => {
       {/* Delete User Modal */}
       <Modal
         visible={deleteModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={() => setDeleteModalVisible(false)}
       >
@@ -627,7 +578,7 @@ const createUser = async () => {
               Are you sure you want to delete user {selectedUser?.fullName}?
             </Text>
             <Text style={styles.warningText}>
-              This action cannot be undone. Consider archiving the user instead.
+              This action cannot be undone. The user will be permanently deleted.
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteModalVisible(false)}>
@@ -641,134 +592,6 @@ const createUser = async () => {
         </View>
       </Modal>
 
-      {/* Create User Modal */}
-      <Modal
-        visible={createModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setCreateModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create New User</Text>
-            <ScrollView style={styles.formContainer}>
-              <Text style={styles.inputLabel}>Full Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.fullName}
-                onChangeText={(text) => handleInputChange('fullName', text)}
-                placeholder="Full Name"
-              />
-              
-              <Text style={styles.inputLabel}>Email *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.email}
-                onChangeText={(text) => handleInputChange('email', text)}
-                placeholder="Email"
-                keyboardType="email-address"
-              />
-              
-              <Text style={styles.inputLabel}>ID Number</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.idNumber}
-                onChangeText={(text) => handleInputChange('idNumber', text)}
-                placeholder="ID Number"
-              />
-              <Text style={styles.inputLabel}>Phone Number</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.phoneNumber}
-                onChangeText={(text) => handleInputChange('phoneNumber', text)}
-                placeholder="Phone Number"
-                keyboardType="phone-pad"
-              />
-              
-              <Text style={styles.inputLabel}>RFID UID</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.rfid_uid}
-                onChangeText={(text) => handleInputChange('rfid_uid', text)}
-                placeholder="RFID UID"
-              />
-              
-              <Text style={styles.inputLabel}>User Type *</Text>
-              <View style={styles.pickerContainer}>
-                {userTypes.map(type => (
-                  <TouchableOpacity 
-                    key={type}
-                    style={[
-                      styles.pickerItem, 
-                      formData.userType === type && styles.selectedPickerItem
-                    ]}
-                    onPress={() => handleInputChange('userType', type)}
-                  >
-                    <Text style={styles.pickerText}>{type}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <Text style={styles.inputLabel}>Program</Text>
-              <View style={styles.pickerContainer}>
-                {programs.map(program => (
-                  <TouchableOpacity 
-                    key={program}
-                    style={[
-                      styles.pickerItem, 
-                      formData.program === program && styles.selectedPickerItem
-                    ]}
-                    onPress={() => handleInputChange('program', program)}
-                  >
-                    <Text style={styles.pickerText}>{program}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <Text style={styles.inputLabel}>Status</Text>
-              <View style={styles.pickerContainer}>
-                {statusOptions.map(status => (
-                  <TouchableOpacity 
-                    key={status}
-                    style={[
-                      styles.pickerItem, 
-                      formData.status === status && styles.selectedPickerItem
-                    ]}
-                    onPress={() => handleInputChange('status', status)}
-                  >
-                    <Text style={styles.pickerText}>{status}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <Text style={styles.inputLabel}>Queue Count</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.numOnQueue?.toString()}
-                onChangeText={(text) => handleInputChange('numOnQueue', parseInt(text) || 0)}
-                placeholder="Queue Count"
-                keyboardType="numeric"
-              />
-            </ScrollView>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setCreateModalVisible(false)}>
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={createUser}>
-                <Text style={styles.buttonText}>Create</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {isLoading && (
-              <View style={styles.modalLoadingOverlay}>
-                <ActivityIndicator size="large" color="#4CAF50" />
-                <Text style={styles.loadingText}>Checking for duplicates...</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -946,6 +769,16 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 16,
     fontSize: 16,
+  },
+  inputError: {
+    borderColor: '#F44336',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: '#F44336',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 8,
   },
   pickerContainer: {
     flexDirection: 'row',

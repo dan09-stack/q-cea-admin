@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from "react-native";
-import { db } from "../firebaseConfig";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db, auth } from "../firebaseConfig";
+import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
-import { auth } from "../firebaseConfig";
+import { getAuth,  } from "firebase/auth";
 
 const FacultyList: React.FC = () => {
   const [facultyData, setFacultyData] = useState<FacultyItem[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [activeSearch, setActiveSearch] = useState(false);
   const [userType, setUserType] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   interface FacultyItem {
     id: string;
@@ -17,6 +18,7 @@ const FacultyList: React.FC = () => {
     status: 'AVAILABLE' | 'UNAVAILABLE';
     numOnQueue: number;
     userType: string;
+    email: string;
   }
 
   const handleSearch = () => {
@@ -25,7 +27,7 @@ const FacultyList: React.FC = () => {
 
   const NoResults = () => (
     <View style={styles.noResultsContainer}>
-      <Text style={styles.noResultsText}>No faculty members found</Text>
+      <Text style={styles.noResultsText}>No authenticated faculty members found</Text>
     </View>
   );
 
@@ -35,53 +37,87 @@ const FacultyList: React.FC = () => {
         faculty.name.toLowerCase().includes(inputValue.toLowerCase())
       );
 
-      const renderFaculty = ({ item }: { item: FacultyItem }) => (
-        <View style={styles.row}>
-          <Text style={[styles.name, { flex: 1 }]}>{item.name}</Text>
-          <Text
-            style={[
-              styles.status,
-              { flex: 1, textAlign: 'center' },
-              { color: item.status === 'AVAILABLE' ? '#00FF00' : '#FF0000' },
-            ]}
-          >
-            {item.status}
-          </Text>
-          <Text style={[styles.studentCount, { flex: 1, textAlign: 'center' }]}>{item.numOnQueue}</Text>
-        </View>
-      );
+  const renderFaculty = ({ item }: { item: FacultyItem }) => (
+    <View style={styles.row}>
+      <Text style={[styles.name, { flex: 1 }]}>{item.name}</Text>
+      <Text
+        style={[
+          styles.status,
+          { flex: 1, textAlign: 'center' },
+          { color: item.status === 'AVAILABLE' ? '#00FF00' : '#FF0000' },
+        ]}
+      >
+        {item.status}
+      </Text>
+      <Text style={[styles.studentCount, { flex: 1, textAlign: 'center' }]}>{item.numOnQueue}</Text>
+    </View>
+  );
 
   useEffect(() => {
-    const facultyCollectionRef = collection(db, 'student');
-    const unsubscribe = onSnapshot(facultyCollectionRef, (snapshot) => {
-      const faculty: FacultyItem[] = snapshot.docs
-        .map(doc => ({
+    const fetchFacultyData = async () => {
+      setIsLoading(true);
+      try {
+        // Get all faculty from Firestore
+        const facultyCollectionRef = collection(db, 'student');
+        const facultyQuery = query(facultyCollectionRef, where("userType", "==", "FACULTY"),where("isVerified", "==", true));
+        const facultySnapshot = await getDocs(facultyQuery);
+        
+        // Get all faculty with email addresses
+        const facultyWithEmails = facultySnapshot.docs.map(doc => ({
           id: doc.id,
           name: doc.data().fullName || '',
           status: doc.data().status || 'UNAVAILABLE',
           userType: doc.data().userType || '',
-          numOnQueue: doc.data().numOnQueue || 0
-        }))
-        .filter(user => user.userType === 'FACULTY')
-        .sort((a, b) => a.name.localeCompare(b.name));
+          numOnQueue: doc.data().numOnQueue || 0,
+          email: doc.data().email || ''
+        }));
+        
+        // Filter to only include faculty with valid emails (authenticated users must have emails)
+        const authenticatedFaculty = facultyWithEmails.filter(faculty => 
+          faculty.email && faculty.email.trim() !== ''
+        );
+        
+        // Sort by name
+        authenticatedFaculty.sort((a, b) => a.name.localeCompare(b.name));
+        
+        setFacultyData(authenticatedFaculty);
+      } catch (error) {
+        console.error("Error fetching faculty data:", error);
+      } finally {
+        setIsLoading(false);
+      }
       
-      setFacultyData(faculty);
+      // Get current user type
       const currentUser = auth.currentUser;
       if (currentUser) {
-        const currentUserDoc = snapshot.docs.find(doc => doc.id === currentUser.uid);
-        if (currentUserDoc) {
-          setUserType(currentUserDoc.data().userType || '');
+        const userDoc = await getDocs(query(
+          collection(db, 'student'), 
+          where("email", "==", currentUser.email)
+        ));
+        
+        if (!userDoc.empty) {
+          setUserType(userDoc.docs[0].data().userType || '');
         }
       }
-    });
+    };
+
+    fetchFacultyData();
+    
+    // Set up real-time listener for updates
+    const facultyCollectionRef = collection(db, 'student');
+    const unsubscribe = onSnapshot(
+      query(facultyCollectionRef, where("userType", "==", "FACULTY")), 
+      (snapshot) => {
+        fetchFacultyData(); // Refresh data when changes occur
+      }
+    );
   
     return () => unsubscribe();
   }, []);
 
   return (
     <View style={styles.container}>
-      
-      <Text style={styles.title}>LIST OF FACULTY</Text>
+      <Text style={styles.title}>LIST OF AUTHENTICATED FACULTY</Text>
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
@@ -106,16 +142,25 @@ const FacultyList: React.FC = () => {
         <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>STATUS</Text>
         <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>WAITING</Text>
       </View>
-      <FlatList
-        data={filteredFacultyData}
-        keyExtractor={(item) => item.id}
-        renderItem={renderFaculty}
-        style={styles.list}
-        ListEmptyComponent={NoResults}
-      />
+      {isLoading ? (
+        <View style={styles.noResultsContainer}>
+          <Text style={styles.noResultsText}>Loading faculty data...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredFacultyData}
+          keyExtractor={(item) => item.id}
+          renderItem={renderFaculty}
+          style={styles.list}
+          ListEmptyComponent={NoResults}
+        />
+      )}
     </View>
   );
 };
+
+// Styles remain the same
+
 
 const styles = StyleSheet.create({
   noResultsContainer: {

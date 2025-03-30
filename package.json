@@ -24,6 +24,7 @@
     "@react-navigation/native-stack": "^7.1.14",
     "@splinetool/react-spline": "^4.0.0",
     "@splinetool/runtime": "^1.9.76",
+    "cors": "^2.8.5",
     "expo": "~52.0.17",
     "expo-blur": "~14.0.3",
     "expo-constants": "~17.0.3",

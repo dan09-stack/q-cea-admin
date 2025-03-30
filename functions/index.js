@@ -1,44 +1,94 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const cors = require('cors');
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const cors = require("cors")({origin: true});
 
-// Initialize Firebase Admin SDK
 admin.initializeApp();
 
-// Allow all origins and include specific headers (like Authorization)
-const corsHandler = cors({
-  origin: true,  // Allow all origins
-  allowedHeaders: ['Content-Type', 'Authorization'],  // Allow 'Authorization' header
-});
-
-exports.deleteAuthUser = functions.https.onRequest((req, res) => {
-  corsHandler(req, res, async () => {
-    console.log("Received request:", req.body);
-
+exports.deleteUser = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
     if (req.method !== "POST") {
-      console.error("Invalid method:", req.method);
-      return res.status(405).send({ error: "Method Not Allowed" });
+      return res.status(405).json({success: false,
+        error: "Method Not Allowed"});
     }
 
-    const { email } = req.body.data || {};  // Safely accessing email within 'data'
-
-    if (!email) {
-      console.error("No email provided");
-      return res.status(400).json({ error: "Email is required" });
+    const {email, userId} = req.body;
+    if (!email || !userId) {
+      return res.status(400).json({success: false,
+        error: "Email and User ID are required"});
     }
 
     try {
-      console.log(`Fetching user by email: ${email}`);
-      const user = await admin.auth().getUserByEmail(email);
-      console.log(`User found: ${user.uid}`);
+      // Get user by email
+      const userRecord = await admin.auth().getUserByEmail(email);
 
-      await admin.auth().deleteUser(user.uid);
-      console.log(`User ${email} deleted successfully`);
+      // Delete user from Firebase Authentication
+      await admin.auth().deleteUser(userRecord.uid);
 
-      return res.json({ success: true, message: `User ${email} deleted` });
+      return res.status(200).json({success: true,
+        message: "User deleted successfully"});
     } catch (error) {
       console.error("Error deleting user:", error);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({success: false, error: error.message});
     }
   });
 });
+exports.deleteauthuser = functions.https.onCall((data, context) => {
+  return admin.auth().getUserByEmail(data.email)
+      .then((userRecord) => {
+        return admin.auth().deleteUser(userRecord.uid);
+      })
+      .then(() => {
+        return {success: true};
+      })
+      .catch((error) => {
+        console.error("Error deleting user:", error);
+        return {success: false, error: error.message};
+      });
+});
+
+// Also add a HTTP version with CORS support for direct fetch calls
+exports.deleteauthuser = functions.https.onRequest((req, res) => {
+  return cors(req, res, () => {
+    if (req.method !== "POST") {
+      return res.status(405).send("Method Not Allowed");
+    }
+    const {email} = req.body;
+    if (!email) {
+      return res.status(400).send({error: "Email is required"});
+    }
+    return admin.auth().getUserByEmail(email)
+        .then((userRecord) => {
+          return admin.auth().deleteUser(userRecord.uid);
+        })
+        .then(() => {
+          return res.status(200).send({success: true});
+        })
+        .catch((error) => {
+          console.error("Error deleting user:", error);
+          return res.status(500).send({success: false, error: error.message});
+        });
+  });
+});
+
+exports.listAllUsers = functions.https.onCall(async (data, context) => {
+  // Check if request is authorized
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Only authenticated users can list users",
+    );
+  }
+
+  try {
+    const listUsersResult = await admin.auth().listUsers();
+    const users = listUsersResult.users.map((userRecord) => ({
+      uid: userRecord.uid,
+      email: userRecord.email,
+      displayName: userRecord.displayName,
+    }));
+    return {users};
+  } catch (error) {
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
+
