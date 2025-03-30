@@ -986,7 +986,7 @@ const AddQueue: React.FC<AddQueueProps> = ({
                 <TextInput
                   style={styles.textInput}
                   placeholder="Enter specific details about the concern"
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor="gray"
                   value={specificDetails}
                   onChangeText={setSpecificDetails}
                   multiline={true}
@@ -1030,7 +1030,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 20,
     padding: 12,
-    color: "white",
+    color: "black",
     borderWidth: 1,
     borderColor: '#ddd',
     textAlignVertical: 'top',
