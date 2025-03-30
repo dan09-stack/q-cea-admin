@@ -18,6 +18,7 @@ import { useAppTheme } from '../utils/theme';
 import { Ionicons } from "@expo/vector-icons";
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 interface AddStudentProps {
   onClose: () => void;
 }
@@ -35,6 +36,7 @@ interface StudentFormData {
 interface ValidationErrors {
   fullName: string;
   idNumber: string;
+  program: string;
   phoneNumber: string;
   email: string;
   password: string;
@@ -42,12 +44,12 @@ interface ValidationErrors {
 }
 
 const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
-  const { 
-    colors, 
-    getInputStyle, 
-    getPlaceholderColor, 
-    getButtonStyle, 
-    getContainerStyle, 
+  const {
+    colors,
+    getInputStyle,
+    getPlaceholderColor,
+    getButtonStyle,
+    getContainerStyle,
     getTextStyle
   } = useAppTheme();
   const defaultFormData: StudentFormData = {
@@ -61,16 +63,17 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
   };
   const [formData, setFormData] = useState<StudentFormData>(defaultFormData);
   const [isLoading, setIsLoading] = useState(false);
-  
-  
+ 
   const [errors, setErrors] = useState<ValidationErrors>({
     fullName: "",
     idNumber: "",
+    program: "",
     phoneNumber: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
+  
   useEffect(() => {
     const loadSavedFormData = async () => {
       try {
@@ -82,9 +85,10 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         console.error('Error loading saved form data:', error);
       }
     };
-    
+   
     loadSavedFormData();
   }, []);
+  
   useEffect(() => {
     const saveFormData = async () => {
       try {
@@ -93,12 +97,13 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         console.error('Error saving form data:', error);
       }
     };
-    
+   
     saveFormData();
   }, [formData]);
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+ 
   const showAlert = (title: string, message: string) => {
     if (Platform.OS === 'web') {
       window.alert(`${title}: ${message}`);
@@ -108,7 +113,7 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
   };
 
   const programs = [
-    { label: "Select Program", value: "" }, 
+    { label: "Select Program", value: "" },
     { label: "B.S. Architecture", value: "ARCH" },
     { label: "B.S. Civil Engineering", value: "CE" },
     { label: "B.S. Computer Engineering", value: "CPE" },
@@ -118,7 +123,8 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
   ];
 
   const validatePhoneNumber = (phoneNumber: string): boolean => {
-    const phoneRegex = /^(09\d{9}|\+63\d{10})$/;
+    // Only accept 09 format (11 digits total: 09 + 9 more digits)
+    const phoneRegex = /^09\d{9}$/;
     return phoneRegex.test(phoneNumber);
   };
 
@@ -128,14 +134,16 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
   };
 
   const validateFullName = (name: string): boolean => {
-    const nameRegex = /^[A-Za-z]{2,}(?: [A-Za-z-]+)*, [A-Za-z-]{2,}(?: [A-Za-z-]+)*(?: [A-Z]\.?(?:[A-Z]\.)?)?$/;
+    // Updated regex to make middle initial optional and period optional
+    const nameRegex = /^[A-Za-z]{2,}(?: [A-Za-z-]+)*(, )[A-Za-z-]{2,}(?: [A-Za-z-]+)*( [A-Z]\.?)?$/;
     return nameRegex.test(name);
   };
+  
 
   const validateStudentIdFormat = (id: string): { isValid: boolean; message: string } => {
     // Student ID format: 03-XXXX-XXXXX or 03-XXXX-XXXXXX
     const studentIdRegex = /^03-\d{4}-\d{5,6}$/;
-    
+   
     if (studentIdRegex.test(id)) {
       return { isValid: true, message: "" };
     } else {
@@ -184,29 +192,28 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
   const checkExistingStudent = async () => {
     try {
       const studentRef = collection(db, 'student');
-      
-      
+     
       // Check for existing idNumber
       const idQuery = query(studentRef, where("idNumber", "==", formData.idNumber));
       const idSnapshot = await getDocs(idQuery);
       if (!idSnapshot.empty) {
         return { exists: true, field: "ID Number" };
       }
-      
+     
       // Check for existing phoneNumber
       const phoneQuery = query(studentRef, where("phoneNumber", "==", formData.phoneNumber));
       const phoneSnapshot = await getDocs(phoneQuery);
       if (!phoneSnapshot.empty) {
         return { exists: true, field: "Phone Number" };
       }
-      
+     
       // Check for existing email
       const emailQuery = query(studentRef, where("email", "==", formData.email));
       const emailSnapshot = await getDocs(emailQuery);
       if (!emailSnapshot.empty) {
         return { exists: true, field: "Email" };
       }
-      
+     
       return { exists: false };
     } catch (error) {
       console.error("Error checking existing student:", error);
@@ -219,57 +226,79 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
     const newErrors: ValidationErrors = {
       fullName: "",
       idNumber: "",
+      program: "", 
       phoneNumber: "",
       email: "",
       password: "",
       confirmPassword: "",
     };
-    
-    // Check for empty fields
-    if (!formData.fullName || !formData.idNumber || !formData.program || 
-        !formData.phoneNumber || !formData.email || !formData.password || !formData.confirmPassword) {
-      showAlert("Error", "Please fill in all fields");
-      return false;
-    }
-    
+   
     // Validate full name
-    if (!validateFullName(formData.fullName)) {
-      newErrors.fullName = "Please enter a valid name in the format: Last Name, First Name";
+    if (!formData.fullName) {
+      newErrors.fullName = "Full name is required";
+      isValid = false;
+    } else if (!validateFullName(formData.fullName)) {
+      newErrors.fullName = "Format should be: Last Name, First Name (MI optional)";
       isValid = false;
     }
-    
+   
     // Validate ID number
-    const idValidation = validateStudentIdFormat(formData.idNumber);
-    if (!idValidation.isValid) {
-      newErrors.idNumber = idValidation.message;
+    if (!formData.idNumber) {
+      newErrors.idNumber = "ID number is required";
+      isValid = false;
+    } else {
+      const idValidation = validateStudentIdFormat(formData.idNumber);
+      if (!idValidation.isValid) {
+        newErrors.idNumber = idValidation.message;
+        isValid = false;
+      }
+    }
+   
+    // Validate program
+    if (!formData.program) {
+      newErrors.program = "Please select a program";
       isValid = false;
     }
-    
+   
     // Validate phone number
-    if (!validatePhoneNumber(formData.phoneNumber)) {
-      newErrors.phoneNumber = "Please enter a valid Philippine phone number (09XXXXXXXXX or +639XXXXXXXXX)";
+    if (!formData.phoneNumber) {
+      newErrors.phoneNumber = "Phone number is required";
+      isValid = false;
+    } else if (!validatePhoneNumber(formData.phoneNumber)) {
+      newErrors.phoneNumber = "Enter a valid phone number (format: 09XXXXXXXXX)";
       isValid = false;
     }
-    
+   
     // Validate email
-    if (!validateEmail(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
+    if (!formData.email) {
+      newErrors.email = "Email is required";
+      isValid = false;
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = "Enter a valid email address";
       isValid = false;
     }
-    
+   
     // Validate password
-    const passwordValidation = validatePassword(formData.password);
-    if (!passwordValidation.isValid) {
-      newErrors.password = passwordValidation.message;
+    if (!formData.password) {
+      newErrors.password = "Password is required";
       isValid = false;
+    } else {
+      const passwordValidation = validatePassword(formData.password);
+      if (!passwordValidation.isValid) {
+        newErrors.password = passwordValidation.message;
+        isValid = false;
+      }
     }
-    
+   
     // Validate password confirmation
-    if (!validatePasswordsMatch(formData.password, formData.confirmPassword)) {
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password";
+      isValid = false;
+    } else if (!validatePasswordsMatch(formData.password, formData.confirmPassword)) {
       newErrors.confirmPassword = "Passwords do not match";
       isValid = false;
     }
-    
+   
     setErrors(newErrors);
     return isValid;
   };
@@ -278,9 +307,9 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
     if (!validateForm()) {
       return;
     }
-    
+   
     setIsLoading(true);
-    
+   
     try {
       // Check if student already exists
       const existingCheck = await checkExistingStudent();
@@ -289,15 +318,15 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         setIsLoading(false);
         return;
       }
-      
+     
       // Use the secondary auth instance for user creation
       const userCredential = await createUserWithEmailAndPassword(
-        userManagementAuth, 
-        formData.email, 
+        userManagementAuth,
+        formData.email,
         formData.password
       );
       const user = userCredential.user;
-  
+
       await db.collection('student').doc(user.uid).set({
         fullName: formData.fullName,
         idNumber: formData.idNumber,
@@ -308,25 +337,39 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         userType: 'STUDENT',
         createdAt: new Date().toISOString()
       });
-      
+     
       await sendEmailVerification(user);
-      
+     
       // Sign out from the secondary auth instance
       await userManagementAuth.signOut();
-      
+     
       await clearSavedFormData();
       showAlert("Success", "Student added successfully");
       onClose();
     } catch (error: any) {
       console.error("Detailed error:", error);
-      showAlert(
-        "Error", 
-        error.message || "Failed to add student"
-      );
+      
+      // Enhanced error handling with specific messages
+      if (error.code === 'auth/email-already-in-use') {
+        showAlert("Error", "This email is already registered. Please use a different email.");
+      } else if (error.code === 'auth/invalid-email') {
+        showAlert("Error", "The email address is not valid.");
+      } else if (error.code === 'auth/weak-password') {
+        showAlert("Error", "The password is too weak. Please choose a stronger password.");
+      } else if (error.code === 'auth/network-request-failed') {
+        showAlert("Error", "Network error. Please check your internet connection and try again.");
+      } else if (error.message) {
+        // If the error has a message property, use it
+        showAlert("Error", error.message);
+      } else {
+        // Fallback error message
+        showAlert("Error", "Failed to add student. Please try again later.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
+  
   const clearSavedFormData = async () => {
     try {
       await AsyncStorage.removeItem('addStudentFormData');
@@ -334,13 +377,16 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
       console.error('Error clearing saved form data:', error);
     }
   };
+  
   const handleCancel = async () => {
     await clearSavedFormData();
     onClose();
   };
+  
   const [showProgramModal, setShowProgramModal] = useState(false);
 
   return (
+    
     <View style={styles.container}>
       <Text style={getTextStyle(styles.title, true)}>REGISTER STUDENT</Text>
       <ScrollView style={getContainerStyle(styles.formGroup)}>
@@ -348,10 +394,15 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
           <Text style={styles.label}>Full Name</Text>
           <TextInput
             style={[styles.input, errors.fullName ? styles.inputError : null]}
-            placeholder="Last Name, First Name"
+            placeholder="Last Name, First Name (MI optional)"
             placeholderTextColor="#000000"
             value={formData.fullName}
-            onChangeText={(text) => setFormData({...formData, fullName: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, fullName: text});
+              if (errors.fullName) {
+                setErrors({...errors, fullName: ""});
+              }
+            }}
           />
           {errors.fullName ? <Text style={styles.errorText}>{errors.fullName}</Text> : null}
         </View>
@@ -363,14 +414,24 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
             placeholder="03-XXXX-XXXXX"
             placeholderTextColor="#000000"
             value={formData.idNumber}
-            onChangeText={(text) => setFormData({...formData, idNumber: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, idNumber: text});
+              if (errors.idNumber) {
+                setErrors({...errors, idNumber: ""});
+              }
+            }}
           />
           {errors.idNumber ? <Text style={styles.errorText}>{errors.idNumber}</Text> : null}
         </View>
+        
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Program</Text>
           <TouchableOpacity
-            style={[styles.input, styles.pickerButton]}
+            style={[
+              styles.input, 
+              styles.pickerButton,
+              errors.program ? styles.inputError : null // Add red border when there's an error
+            ]}
             onPress={() => setShowProgramModal(true)}
           >
             <Text style={[
@@ -380,18 +441,23 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
               {formData.program ? programs.find(p => p.value === formData.program)?.label || "Select Program" : "Select Program"}
             </Text>
           </TouchableOpacity>
-
+          {errors.program ? <Text style={styles.errorText}>{errors.program}</Text> : null}
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Phone Number</Text>
           <TextInput
             style={[styles.input, errors.phoneNumber ? styles.inputError : null]}
-            placeholder="Phone Number (09XXXXXXXXX)"
+            placeholder="09XXXXXXXXX"
             placeholderTextColor="#000000"
             keyboardType="phone-pad"
             value={formData.phoneNumber}
-            onChangeText={(text) => setFormData({...formData, phoneNumber: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, phoneNumber: text});
+              if (errors.phoneNumber) {
+                setErrors({...errors, phoneNumber: ""});
+              }
+            }}
           />
           {errors.phoneNumber ? <Text style={styles.errorText}>{errors.phoneNumber}</Text> : null}
         </View>
@@ -404,7 +470,12 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
             placeholderTextColor="#000000"
             keyboardType="email-address"
             value={formData.email}
-            onChangeText={(text) => setFormData({...formData, email: text})}
+            onChangeText={(text) => {
+              setFormData({...formData, email: text});
+              if (errors.email) {
+                setErrors({...errors, email: ""});
+              }
+            }}
           />
           {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
         </View>
@@ -418,18 +489,23 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
               placeholderTextColor="#000000"
               secureTextEntry={!showPassword}
               value={formData.password}
-              onChangeText={(text) => setFormData({...formData, password: text})}
+              onChangeText={(text) => {
+                setFormData({...formData, password: text});
+                if (errors.password) {
+                  setErrors({...errors, password: ""});
+                }
+              }}
             />
-        <TouchableOpacity 
-          style={styles.eyeIcon} 
-          onPress={() => setShowPassword(!showPassword)}
-        >
-          <Icon
-            name={showPassword ? "eye-outline" : "eye-off-outline"}
-            size={24}
-            color="black"
-          />
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Icon
+                name={showPassword ? "eye-outline" : "eye-off-outline"}
+                size={24}
+                color="black"
+              />
+            </TouchableOpacity>
           </View>
           {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
         </View>
@@ -443,16 +519,21 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
               placeholderTextColor="#000000"
               secureTextEntry={!showConfirmPassword}
               value={formData.confirmPassword}
-              onChangeText={(text) => setFormData({...formData, confirmPassword: text})}
+              onChangeText={(text) => {
+                setFormData({...formData, confirmPassword: text});
+                if (errors.confirmPassword) {
+                  setErrors({...errors, confirmPassword: ""});
+                }
+              }}
             />
-            <TouchableOpacity 
-              style={styles.eyeIcon} 
+            <TouchableOpacity
+              style={styles.eyeIcon}
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
             >
               <Icon
                 name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
                 size={24}
-                color="black" 
+                color="black"
               />
             </TouchableOpacity>
           </View>
@@ -460,18 +541,18 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={getButtonStyle(styles.cancelButton, true)} 
+          <TouchableOpacity
+            style={getButtonStyle(styles.cancelButton, true)}
             onPress={handleCancel}
             disabled={isLoading}
           >
             <Text style={styles.buttonText}>CANCEL</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               getButtonStyle(styles.addButton),
               isLoading ? styles.disabledButton : null
-            ]} 
+            ]}
             onPress={handleAdd}
             disabled={isLoading}
           >
@@ -489,23 +570,26 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Program</Text>
             <ScrollView style={styles.modalScrollView}>
-              {programs.filter(p => p.value !== "").map((program, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    setFormData({...formData, program: program.value});
-                    setShowProgramModal(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.modalItemText,
-                    formData.program === program.value && styles.selectedModalItem
-                  ]}>
-                    {program.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {programs.filter(p => p.value !== "").map((program, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.modalItem}
+                onPress={() => {
+                  setFormData({...formData, program: program.value});
+                  if (errors.program) {
+                    setErrors({...errors, program: ""}); // Clear the error when a program is selected
+                  }
+                  setShowProgramModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  formData.program === program.value && styles.selectedModalItem
+                ]}>
+                  {program.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
             </ScrollView>
             <TouchableOpacity
               style={styles.modalCloseButton}
@@ -522,69 +606,69 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
 
 const styles = StyleSheet.create({
   pickerButton: {
-    justifyContent: 'center', 
+    justifyContent: 'center',
     alignItems: 'flex-start',    
   },
   centeredText: {
     textAlign: 'center',
   },
-modalOverlay: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-},
-modalContent: {
-  width: '80%',
-  maxHeight: '70%',
-  backgroundColor: 'white',
-  borderRadius: 10,
-  padding: 20,
-  alignItems: 'center',
-},
-modalTitle: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  marginBottom: 15,
-},
-modalScrollView: {
-  width: '100%',
-  marginBottom: 15,
-},
-modalItem: {
-  paddingVertical: 12,
-  paddingHorizontal: 10,
-  borderBottomWidth: 1,
-  borderBottomColor: '#eee',
-  width: '100%',
-},
-modalItemText: {
-  fontSize: 16,
-},
-selectedModalItem: {
-  fontWeight: 'bold',
-  color: '#0f790f',
-},
-modalCloseButton: {
-  backgroundColor: '#1c4e1e',
-  paddingVertical: 10,
-  paddingHorizontal: 20,
-  borderRadius: 5,
-  marginTop: 15,
-  alignSelf: 'center',
-},
-modalCloseButtonText: {
-  color: 'white',
-  fontWeight: 'bold',
-},
-pickerText: {
-  fontSize: 16,
-  color: '#000000',
-},
-pickerPlaceholder: {
-  fontSize: 16,
-  color: '#999999',
-},
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    maxHeight: '70%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalScrollView: {
+    width: '100%',
+    marginBottom: 15,
+  },
+  modalItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    width: '100%',
+  },
+  modalItemText: {
+    fontSize: 16,
+  },
+  selectedModalItem: {
+    fontWeight: 'bold',
+    color: '#0f790f',
+  },
+  modalCloseButton: {
+    backgroundColor: '#1c4e1e',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginTop: 15,
+    alignSelf: 'center',
+  },
+  modalCloseButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  pickerText: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  pickerPlaceholder: {
+    fontSize: 16,
+    color: '#999999',
+  },
   formGroup: {
     paddingLeft: 40,
     width: "100%",
@@ -601,7 +685,7 @@ pickerPlaceholder: {
     backgroundColor: "#fff",
     alignItems: "center",
     padding: 30,
-    borderRadius: 15, 
+    borderRadius: 15,
     borderColor: '#800020',
     borderWidth: 1,
   },
