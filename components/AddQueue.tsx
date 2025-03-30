@@ -151,7 +151,10 @@ const AddQueue: React.FC<AddQueueProps> = ({
     setIsCheckingRequest(true);
   
     const studentsCollectionRef = collection(db, 'student');
-    const studentsQuery = firestoreQuery(studentsCollectionRef, firestoreWhere('userType', '==', 'STUDENT'));
+    const studentsQuery = firestoreQuery(studentsCollectionRef, 
+      firestoreWhere('userType', '==', 'STUDENT'),
+      firestoreWhere('isVerified', '==', true)
+      );
     
     const unsubscribeStudents = onSnapshot(studentsQuery, (snapshot) => {
       const students = snapshot.docs.map(doc => ({
@@ -162,7 +165,11 @@ const AddQueue: React.FC<AddQueueProps> = ({
     });
   
     const facultyCollectionRef = collection(db, 'student');
-    const facultyQuery = firestoreQuery(facultyCollectionRef, firestoreWhere('userType', '==', 'FACULTY'));
+    const facultyQuery = firestoreQuery(
+      facultyCollectionRef, 
+      firestoreWhere('userType', '==', 'FACULTY'),
+      firestoreWhere('isVerified', '==', true) 
+    );
     
     const unsubscribeFaculty = onSnapshot(facultyQuery, (snapshot) => {
       const faculty = snapshot.docs.map((doc) => ({
@@ -593,6 +600,7 @@ const AddQueue: React.FC<AddQueueProps> = ({
           <Text style={styles.modalTitle}>Select Student</Text>
           <ScrollView style={styles.modalScrollView}>
             {studentsList
+            
               .sort((a, b) => a.fullName.localeCompare(b.fullName))
               .map((student) => (
                 <TouchableOpacity

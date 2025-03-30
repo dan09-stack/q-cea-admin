@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity } from "r
 import { db, auth } from "../firebaseConfig";
 import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
-import { getAuth, listUsers } from "firebase/auth";
+import { getAuth,  } from "firebase/auth";
 
 const FacultyList: React.FC = () => {
   const [facultyData, setFacultyData] = useState<FacultyItem[]>([]);
@@ -59,7 +59,7 @@ const FacultyList: React.FC = () => {
       try {
         // Get all faculty from Firestore
         const facultyCollectionRef = collection(db, 'student');
-        const facultyQuery = query(facultyCollectionRef, where("userType", "==", "FACULTY"));
+        const facultyQuery = query(facultyCollectionRef, where("userType", "==", "FACULTY"),where("isVerified", "==", true));
         const facultySnapshot = await getDocs(facultyQuery);
         
         // Get all faculty with email addresses

@@ -10,7 +10,7 @@ import {
   Modal,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { db, auth } from "../firebaseConfig";
+import { db, auth, userManagementAuth } from "../firebaseConfig";
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
@@ -185,12 +185,6 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
     try {
       const studentRef = collection(db, 'student');
       
-      // Check for existing fullName
-      const nameQuery = query(studentRef, where("fullName", "==", formData.fullName));
-      const nameSnapshot = await getDocs(nameQuery);
-      if (!nameSnapshot.empty) {
-        return { exists: true, field: "Full Name" };
-      }
       
       // Check for existing idNumber
       const idQuery = query(studentRef, where("idNumber", "==", formData.idNumber));
@@ -296,21 +290,30 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
         return;
       }
       
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      // Use the secondary auth instance for user creation
+      const userCredential = await createUserWithEmailAndPassword(
+        userManagementAuth, 
+        formData.email, 
+        formData.password
+      );
       const user = userCredential.user;
-
+  
       await db.collection('student').doc(user.uid).set({
         fullName: formData.fullName,
         idNumber: formData.idNumber,
         phoneNumber: formData.phoneNumber,
         program: formData.program,
         email: formData.email,
-        isVerified: true,
+        isVerified: false,
         userType: 'STUDENT',
         createdAt: new Date().toISOString()
       });
       
       await sendEmailVerification(user);
+      
+      // Sign out from the secondary auth instance
+      await userManagementAuth.signOut();
+      
       await clearSavedFormData();
       showAlert("Success", "Student added successfully");
       onClose();
@@ -417,16 +420,16 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
               value={formData.password}
               onChangeText={(text) => setFormData({...formData, password: text})}
             />
-            <TouchableOpacity 
-              style={styles.eyeIcon} 
-              onPress={() => setShowPassword(!showPassword)}
-            >
-            <Icon
-                  name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={24}
-                  color="black"
-                />
-            </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.eyeIcon} 
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Icon
+            name={showPassword ? "eye-outline" : "eye-off-outline"}
+            size={24}
+            color="black"
+          />
+        </TouchableOpacity>
           </View>
           {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
         </View>
@@ -447,11 +450,11 @@ const AddStudentScreen: React.FC<AddStudentProps> = ({ onClose }) => {
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
             >
               <Icon
-                  name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={24}
-                  color="black"
-                />
-              </TouchableOpacity>
+                name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
+                size={24}
+                color="black" 
+              />
+            </TouchableOpacity>
           </View>
           {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
         </View>

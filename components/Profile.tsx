@@ -46,37 +46,35 @@ const [successModalMessage, setSuccessModalMessage] = useState('');
           setIsLoading(false);
           return;
         }
-        const userCollection = userData.userType === 'ADMIN' ? 'admin' : 'student';
-        const userRef = firebase.firestore().collection(userCollection).doc(currentUser.uid);
-        const docSnapshot = await getDoc(userRef);
+  
+        // First, check if the user exists in the admin collection
+        let userRef = firebase.firestore().collection('admin').doc(currentUser.uid);
+        let docSnapshot = await getDoc(userRef);
+        
+        // If not found in admin collection, check the student collection
+        if (!docSnapshot.exists()) {
+          userRef = firebase.firestore().collection('student').doc(currentUser.uid);
+          docSnapshot = await getDoc(userRef);
+        }
         
         if (docSnapshot.exists()) {
           const data = docSnapshot.data();
           setUserData(data);
-          setImageUrl(data?.profilePicture || null);
+          // Rest of your code to handle the user data...
         } else {
-          // Try to fetch from admin collection if not found in student collection
-          const adminRef = doc(db, 'admin', currentUser.uid);
-          const adminSnapshot = await getDoc(adminRef);
-          
-          if (adminSnapshot.exists()) {
-            const data = adminSnapshot.data();
-            setUserData(data);
-            setImageUrl(data?.profilePicture || null);
-          } else {
-            Alert.alert('Error', 'User data not found');
-          }
+          Alert.alert('Error', 'User data not found');
         }
+        
+        setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching user data: ', error);
-        Alert.alert('Error', 'Could not load profile data. Please try again.');
-      } finally {
+        console.error('Error fetching user data:', error);
         setIsLoading(false);
       }
     };
-
+  
     fetchUserData();
   }, []);
+  
   const SuccessModal = () => (
     <Modal
       animationType="fade"

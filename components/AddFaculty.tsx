@@ -10,7 +10,7 @@ import {
   Modal,
   FlatList,
 } from "react-native";
-import { db, auth } from "../firebaseConfig";
+import { db, auth, userManagementAuth } from "../firebaseConfig";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { Platform } from 'react-native';
 import { useAppTheme } from '../utils/theme';
@@ -282,7 +282,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     
     // Validate phone number format
     if (!validatePhoneNumber(formData.phoneNumber)) {
-      newErrors.phoneNumber = "Please enter a valid Philippine phone number (e.g., 09XXXXXXXXX or +63XXXXXXXXXX)";
+      newErrors.phoneNumber = "Please enter a valid Philippine phone number (e.g., 09XXXXXXXXXX or +63XXXXXXXXXX)";
       isValid = false;
     }
     
@@ -324,14 +324,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
     try {
       const studentCollection = collection(db, 'student');
       
-      // Check for duplicate full name
-      const nameQuery = query(studentCollection, where('fullName', '==', formData.fullName));
-      const nameSnapshot = await getDocs(nameQuery);
-      if (!nameSnapshot.empty) {
-        showAlert("Error", "A faculty member with this name already exists");
-        return true;
-      }
-      
+     
       // Check for duplicate ID number
       const idQuery = query(studentCollection, where('idNumber', '==', formData.idNumber));
       const idSnapshot = await getDocs(idQuery);
@@ -383,7 +376,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           return;
         }
         
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+        const userCredential = await createUserWithEmailAndPassword(userManagementAuth, formData.email, formData.password);
         const user = userCredential.user;
 
         await db.collection('student').doc(user.uid).set({
@@ -392,7 +385,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           phoneNumber: formData.phoneNumber,
           program: formData.program,
           email: formData.email,
-          isVerified: true,
+          isVerified: false,
           userType: 'FACULTY',
           numOnQueue: 0,
           status: 'UNAVAILABLE',
@@ -400,7 +393,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           createdAt: new Date().toISOString()
         });
         await sendEmailVerification(user);
-  
+        await userManagementAuth.signOut();
         // Clear the form data after successful submission
         await clearSavedFormData();
         setFormData(defaultFormData);
@@ -439,7 +432,8 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
 
   // Handle cancel button with confirmation
   const handleCancel = () => {
-    // Don't clear the form data when canceling, just close the form
+    clearSavedFormData();
+    setFormData(defaultFormData);
     onClose();
   };
   
@@ -582,7 +576,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
               onPress={() => setShowPassword(!showPassword)}
             >
               <Icon 
-                name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                name={showPassword ?`eye-outline` : `eye-off-outline`} 
                 size={24} 
                 color="#666"
               />
@@ -620,7 +614,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
             >
               <Icon 
-                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
+                name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
                 size={24} 
                 color="#666"
               />

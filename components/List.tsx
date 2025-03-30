@@ -578,7 +578,7 @@ const List: React.FC = () => {
               Are you sure you want to delete user {selectedUser?.fullName}?
             </Text>
             <Text style={styles.warningText}>
-              This action cannot be undone. Consider archiving the user instead.
+              This action cannot be undone. The user will be permanently deleted.
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteModalVisible(false)}>
