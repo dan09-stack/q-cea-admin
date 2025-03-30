@@ -370,30 +370,43 @@ const List: React.FC = () => {
     <View style={styles.userItem}>
       <View style={styles.userInfo}>
         <Text style={styles.userName}>{item.fullName}</Text>
-        <Text style={styles.userDetail}>Email: {item.email}</Text>
-        <Text style={styles.userDetail}>ID: {item.idNumber}</Text>
+  
+        {/*  for visitors */}
         <Text style={styles.userDetail}>Type: {item.userType}</Text>
         <Text style={styles.userDetail}>Program: {item.program}</Text>
         <Text style={styles.userDetail}>
-          Ticket Number: {item.userTicketNumber || 'No active ticket'}</Text>
-        <Text style={styles.userDetail}>Status: 
-          <Text style={item.status === 'AVAILABLE' ? styles.statusOnline : styles.statusOffline}>
-            {item.status}
-          </Text>
+          Ticket Number: {item.userTicketNumber || 'No active ticket'}
         </Text>
+  
+        {/* for students and faculty */}
+        {(item.userType === 'STUDENT' || item.userType === 'FACULTY') && (
+          <>
+            <Text style={styles.userDetail}>Email: {item.email}</Text>
+            <Text style={styles.userDetail}>ID: {item.idNumber}</Text>
+            <Text style={styles.userDetail}>
+              Status: 
+              <Text
+                style={item.status === 'AVAILABLE' ? styles.statusOnline : styles.statusOffline}
+              >
+                {item.status}
+              </Text>
+            </Text>
+          </>
+        )}
       </View>
+  
       <View style={styles.actionButtons}>
         <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editButton}>
           <Icon name="create-outline" size={24} color="#fff" />
         </TouchableOpacity>
-        
+  
         <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteButton}>
           <Icon name="trash-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
   );
-
+  
   return (
     <View style={styles.container}>
       <View style={styles.header}>
