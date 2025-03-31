@@ -67,6 +67,7 @@ const List: React.FC = () => {
     { label: "Program Head-Mechanical Engineering", value: "PH-ME" },
   ];
   
+  const [assignedProgramHeads, setAssignedProgramHeads] = useState<string[]>([]);
 
   // User types list for dropdown
   const userTypes = [
@@ -107,7 +108,38 @@ const List: React.FC = () => {
     const phoneRegex = /^(09|\+639)\d{9}$/;
     return phoneRegex.test(phone);
   };
-
+  const fetchAssignedProgramHeads = async () => {
+    try {
+      const facultyRef = collection(db, 'student');
+      const programHeadQuery = query(
+        facultyRef, 
+        where('userType', '==', 'FACULTY'),
+        where('program', 'in', programHeadOptions.map(p => p.value))
+      );
+      
+      const querySnapshot = await getDocs(programHeadQuery);
+      const assignedPrograms: string[] = [];
+      
+      querySnapshot.forEach(doc => {
+        // Don't include the current user's program in the "assigned" list
+        if (doc.id !== selectedUser?.id) {
+          const data = doc.data();
+          if (data.program && data.program.startsWith('PH-')) {
+            assignedPrograms.push(data.program);
+          }
+        }
+      });
+      
+      setAssignedProgramHeads(assignedPrograms);
+    } catch (error) {
+      console.error('Error fetching assigned program heads:', error);
+    }
+  };
+  useEffect(() => {
+    if (modalVisible && selectedUser && formData.userType === 'FACULTY') {
+      fetchAssignedProgramHeads();
+    }
+  }, [modalVisible, selectedUser]);
   // Fetch users from Firestore
   useEffect(() => {
     const usersRef = collection(db, 'student');
@@ -254,7 +286,7 @@ const List: React.FC = () => {
       showAlert('Error', 'Full Name, ID Number, and Phone Number are required fields.');
       return;
     }
-
+  
     // Validate formats
     let hasError = false;
     
@@ -270,6 +302,16 @@ const List: React.FC = () => {
     
     if (!validatePhoneNumber(formData.phoneNumber)) {
       setPhoneNumberError('Phone Number should be in format 09XXXXXXXXX or +639XXXXXXXXX');
+      hasError = true;
+    }
+    
+    // Check if the selected program is a program head position that's already assigned
+    if (formData.userType === 'FACULTY' && 
+        formData.program && 
+        formData.program.startsWith('PH-') && 
+        assignedProgramHeads.includes(formData.program) && 
+        formData.program !== selectedUser.program) {
+      showAlert('Error', `The position ${formData.program} is already assigned to another faculty member.`);
       hasError = true;
     }
     

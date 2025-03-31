@@ -8,7 +8,8 @@ import { collection, CollectionReference, doc, DocumentData, getDoc, getDocs, on
   writeBatch,
   query,
   where,
-  increment} from 'firebase/firestore';
+  increment,
+  setDoc} from 'firebase/firestore';
 import { Query, QuerySnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { query as firestoreQuery, where as firestoreWhere } from 'firebase/firestore';
 import { useAppTheme } from "@/utils/theme";
@@ -459,6 +460,22 @@ const AddQueue: React.FC<AddQueueProps> = ({
         setIsRequested(true);
         Alert.alert('Success', `Queue position: ${queuePosition}`);
       }
+      const handleSubmitRating = async () => {
+        try {
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            await setDoc(doc(db, 'ratings', `${currentUser.uid}_${Date.now()}`), {
+              userId: currentUser.uid,
+              faculty: selectedFaculty,  
+              concern: selectedConcern,  
+              timestamp: new Date()
+            });
+          }
+        } catch (error) {
+          console.error('Error submitting rating:', error);
+        }
+      };
+      handleSubmitRating();
     } catch (error) {
       console.log('Error updating queue:', error);
       Alert.alert('Error', 'Failed to join queue');
@@ -467,6 +484,7 @@ const AddQueue: React.FC<AddQueueProps> = ({
     }
   };
 
+ 
   const handleCancelQueue = async () => {
     try {
       console.log("Starting cancel queue for selected student:", selectedStudent);

@@ -13,7 +13,7 @@ import {
   FlatList,
 } from "react-native";
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp, getDoc, setDoc, increment, getDocs } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
 import { useAppTheme } from "@/utils/theme";
 
 interface AddQueueVisitorProps {
@@ -180,7 +180,22 @@ const AddQueueVisitor: React.FC<AddQueueVisitorProps> = ({ onClose }) => {
       await updateDoc(doc(db, 'student', selectedFacultyId), {
         numOnQueue: increment(1)
       });
-
+      const handleSubmitRating = async () => {
+        try {
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            await setDoc(doc(db, 'ratings', `${currentUser.uid}_${Date.now()}`), {
+              userId: currentUser.uid,
+              faculty: selectedFaculty,  
+              concern: selectedConcern,  
+              timestamp: new Date()
+            });
+          }
+        } catch (error) {
+          console.error('Error submitting rating:', error);
+        }
+      };
+      handleSubmitRating();
       setTicketNumber(newNumber.toString());
       showAlert(`Queue ticket created successfully. Your ticket number is ${newNumber} and your position in queue is ${queuePosition}.`);
       onClose(); // Close the form after successful submission
