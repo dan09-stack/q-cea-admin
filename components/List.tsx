@@ -104,7 +104,7 @@ const List: React.FC = () => {
 
   const validatePhoneNumber = (phone: string): boolean => {
     // Phone format: 09XXXXXXXXX or +639XXXXXXXXX
-    const phoneRegex = /^(09|\+639)\d{9}$/;
+    const phoneRegex = /^09\d{9}$/;
     return phoneRegex.test(phone);
   };
 
@@ -264,12 +264,12 @@ const List: React.FC = () => {
     }
     
     if (!validateIdNumber(formData.idNumber, formData.userType as string)) {
-      setIdNumberError('ID Number should be in format UP-XX-XXX-X for faculty or UP-XXXX-XXXXX/UP-XXXX-XXXXXX for students');
+      setIdNumberError('ID Number should be in format UP-XX-XXX-F for faculty or 03-XXXX-XXXXX/03-XXXX-XXXXXX for students');
       hasError = true;
     }
     
     if (!validatePhoneNumber(formData.phoneNumber)) {
-      setPhoneNumberError('Phone Number should be in format 09XXXXXXXXX or +639XXXXXXXXX');
+      setPhoneNumberError('Phone Number should be in format 09XXXXXXXXX');
       hasError = true;
     }
     

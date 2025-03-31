@@ -480,24 +480,26 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
 
   // Handle cancel button with confirmation
   const handleCancel = () => {
-    Alert.alert(
-      "Confirm Cancel",
-      "Are you sure you want to cancel? All entered data will be lost.",
-      [
-        {
-          text: "No",
-          style: "cancel"
-        },
-        {
-          text: "Yes",
-          onPress: () => {
-            clearSavedFormData();
-            setFormData(defaultFormData);
-            onClose();
-          }
-        }
-      ]
-    );
+    // Alert.alert(
+    //   "Confirm Cancel",
+    //   "Are you sure you want to cancel? All entered data will be lost.",
+    //   [
+    //     {
+    //       text: "No",
+    //       style: "cancel"
+    //     },
+    //     {
+    //       text: "Yes",
+    //       onPress: () => {
+    //         clearSavedFormData();
+    //         setFormData(defaultFormData);
+    //         onClose();
+    //       }
+    //     }
+    //   ]
+    // );
+    clearSavedFormData();
+    onClose();
   };
  
   return (
@@ -724,6 +726,7 @@ const AddFacultyScreen: React.FC<AddFacultyProps> = ({ onClose }) => {
           >
             <Text style={styles.buttonText}>CANCEL</Text>
           </TouchableOpacity>
+              
           <TouchableOpacity
             style={[
               getButtonStyle(styles.addButton),
