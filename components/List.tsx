@@ -535,7 +535,7 @@ const List: React.FC = () => {
               />
               {phoneNumberError && <Text style={styles.errorText}>{phoneNumberError}</Text>}
 
-              {formData.userType !== 'STUDENT' && (
+              {formData.userType == 'FACULTLY' && (
                 <>
                   <Text style={styles.inputLabel}>RFID UID</Text>
                   <TextInput
